@@ -1,0 +1,2 @@
+id,username,password_hex,nome,cognome,email,telefono,data_nascita,data_registrazione,attivo
+1,mario,0c36c809541d1ed83489723727b0e17659ecc8d02d221022df3eb988a95d7fc2,Mario,Rossi,mario@example.com,333111,1990-01-15,2026-04-23 11:56:21,1

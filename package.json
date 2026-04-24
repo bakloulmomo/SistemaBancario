@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "add-skill": "^2.0.0",
+    "caveman-skill": "^1.0.0"
+  }
+}
