@@ -59,6 +59,15 @@ int json_get_num(const char *json, const char *chiave, double *val_out);
 /* Rimuove spazi iniziali/finali in-place */
 void str_trim(char *s);
 
+/* Ricerca case-insensitive di needle in haystack. Ritorna 1 se trovato. */
+int str_contains_ci(const char *haystack, const char *needle);
+
+/* Genera username: "abcd_wxyz_NNN" da nome, cognome e suffisso numerico. */
+void genera_username(const char *nome, const char *cognome, int suffisso, char *out, int outsize);
+
+/* Rimuove tutte le sessioni attive di un dato id_utente. */
+void sessioni_rimuovi_utente(StatoBanca *banca, int id_utente);
+
 /* Escape delle virgole nei campi CSV (sostituisce , con \\,) */
 void csv_escape(const char *in, char *out, int outsize);
 
@@ -68,8 +77,7 @@ void csv_unescape(const char *in, char *out, int outsize);
 /* ---- Statistiche ---- */
 
 /* Calcola statistiche e scrive JSON nel buffer */
-void statistiche_json(StatoBanca *banca, int id_utente,
-                      char *out, int outsize);
+void statistiche_json(StatoBanca *banca, int id_utente, char *out, int outsize);
 
 /* ---- Stampa barre ASCII (||||) proporzionali ---- */
 void stampa_barre(double valore, double max_val, int larghezza, char *out);

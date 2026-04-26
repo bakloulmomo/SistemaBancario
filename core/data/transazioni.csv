@@ -1,3 +1,3 @@
 id,id_conto,tipo,importo,descrizione,data,iban_controparte
-2,1,1,100.00,prelievo ATM,2026-04-23 11:56:21,
-1,1,0,500.00,stipendio,2026-04-23 11:56:21,
+1,1,0,100.00,Deposito iniziale,2026-04-26 22:32:29,
+2,2,0,1000.00,Deposito iniziale,2026-04-26 22:41:14,

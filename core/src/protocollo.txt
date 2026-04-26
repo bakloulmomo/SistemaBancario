@@ -1,0 +1,473 @@
+=====================================================================
+  PROTOCOLLO JSON — Comunicazione Node.js ↔ banca_core (C)
+=====================================================================
+
+MECCANISMO
+----------
+Node.js spawna il processo C come figlio (child_process.spawn).
+Invia UNA riga JSON su stdin, legge UNA riga JSON da stdout, poi
+il processo C termina. Una invocazione = un comando.
+
+FORMATO GENERALE
+----------------
+Input  → {"cmd":"<nome_comando>", ...campi...}
+Output → {"status":"ok","data":{...}}
+       | {"status":"ok"}
+       | {"status":"error","message":"<testo>"}
+
+Tutti i valori stringa vanno tra virgolette.
+I numeri (importo, tipo) senza virgolette.
+
+=====================================================================
+  COMANDI — DETTAGLIO
+=====================================================================
+
+---------------------------------------------------------------------
+1. registra
+---------------------------------------------------------------------
+INPUT:
+{
+  "cmd":          "registra",
+  "username":     "mario_rossi",
+  "password":     "miaPassword123",
+  "nome":         "Mario",
+  "cognome":      "Rossi",
+  "email":        "mario@email.it",
+  "telefono":     "3331234567",
+  "data_nascita": "1990-05-20"
+}
+
+OUTPUT OK:
+{
+  "status": "ok",
+  "data": {
+    "id": 1,
+    "username": "mario_rossi",
+    "nome": "Mario",
+    "cognome": "Rossi",
+    "email": "mario@email.it",
+    "telefono": "3331234567",
+    "data_nascita": "1990-05-20",
+    "data_registrazione": "2024-01-15 10:30:00"
+  }
+}
+
+OUTPUT ERRORE:
+{"status":"error","message":"username già esistente"}
+{"status":"error","message":"parametri mancanti"}
+
+---------------------------------------------------------------------
+2. login
+---------------------------------------------------------------------
+INPUT:
+{
+  "cmd":      "login",
+  "username": "mario_rossi",
+  "password": "miaPassword123"
+}
+
+OUTPUT OK:
+{
+  "status": "ok",
+  "data": {
+    "token": "a3f8c2...64hexchars...e9b1",
+    "utente": {
+      "id": 1,
+      "username": "mario_rossi",
+      "nome": "Mario",
+      "cognome": "Rossi",
+      "email": "mario@email.it",
+      "telefono": "3331234567",
+      "data_nascita": "1990-05-20",
+      "data_registrazione": "2024-01-15 10:30:00"
+    }
+  }
+}
+
+OUTPUT ERRORE:
+{"status":"error","message":"credenziali non valide"}
+{"status":"error","message":"parametri mancanti"}
+
+NOTA: il token è 64 caratteri esadecimali. Va salvato dal client e
+inviato come campo "token" in tutti i comandi successivi.
+Scadenza: 1 ora di inattività (sliding window — si rinnova ad ogni uso).
+
+---------------------------------------------------------------------
+3. logout
+---------------------------------------------------------------------
+INPUT:
+{
+  "cmd":   "logout",
+  "token": "a3f8c2...64hexchars...e9b1"
+}
+
+OUTPUT OK:
+{"status":"ok"}
+
+OUTPUT ERRORE:
+{"status":"error","message":"token mancante"}
+
+---------------------------------------------------------------------
+4. profilo
+---------------------------------------------------------------------
+INPUT:
+{
+  "cmd":   "profilo",
+  "token": "a3f8c2...64hexchars...e9b1"
+}
+
+OUTPUT OK:
+{
+  "status": "ok",
+  "data": {
+    "id": 1,
+    "username": "mario_rossi",
+    "nome": "Mario",
+    "cognome": "Rossi",
+    "email": "mario@email.it",
+    "telefono": "3331234567",
+    "data_nascita": "1990-05-20",
+    "data_registrazione": "2024-01-15 10:30:00"
+  }
+}
+
+OUTPUT ERRORE:
+{"status":"error","message":"sessione non valida o scaduta"}
+
+---------------------------------------------------------------------
+5. aggiorna_profilo
+---------------------------------------------------------------------
+INPUT:
+{
+  "cmd":      "aggiorna_profilo",
+  "token":    "a3f8c2...64hexchars...e9b1",
+  "nome":     "Mario",
+  "cognome":  "Bianchi",
+  "email":    "nuova@email.it",
+  "telefono": "3339876543"
+}
+
+NOTA: i campi nome/cognome/email/telefono sono tutti opzionali.
+Quelli omessi o vuoti non vengono modificati.
+
+OUTPUT OK:
+{"status":"ok"}
+
+OUTPUT ERRORE:
+{"status":"error","message":"sessione non valida o scaduta"}
+{"status":"error","message":"aggiornamento profilo fallito"}
+
+---------------------------------------------------------------------
+6. cambia_password
+---------------------------------------------------------------------
+INPUT:
+{
+  "cmd":              "cambia_password",
+  "token":            "a3f8c2...64hexchars...e9b1",
+  "vecchia_password": "miaPassword123",
+  "nuova_password":   "NuovaPass456"
+}
+
+OUTPUT OK:
+{"status":"ok"}
+
+OUTPUT ERRORE:
+{"status":"error","message":"password attuale errata"}
+{"status":"error","message":"parametri mancanti"}
+
+---------------------------------------------------------------------
+7. apri_conto
+---------------------------------------------------------------------
+INPUT:
+{
+  "cmd":   "apri_conto",
+  "token": "a3f8c2...64hexchars...e9b1",
+  "tipo":  0
+}
+
+VALORI tipo:
+  0 → conto corrente
+  1 → conto risparmio
+
+OUTPUT OK:
+{
+  "status": "ok",
+  "data": {
+    "id": 1,
+    "iban": "IT600123456789000000000001",
+    "id_utente": 1,
+    "saldo": 0.00,
+    "tipo": "corrente",
+    "data_apertura": "2024-01-15 10:35:00"
+  }
+}
+
+OUTPUT ERRORE:
+{"status":"error","message":"apertura conto fallita"}
+{"status":"error","message":"sessione non valida o scaduta"}
+
+---------------------------------------------------------------------
+8. chiudi_conto
+---------------------------------------------------------------------
+INPUT:
+{
+  "cmd":   "chiudi_conto",
+  "token": "a3f8c2...64hexchars...e9b1",
+  "iban":  "IT600123456789000000000001"
+}
+
+REGOLE:
+  - Il saldo deve essere 0.00 (non si chiude un conto con fondi).
+  - Il conto deve appartenere all'utente autenticato.
+
+OUTPUT OK:
+{"status":"ok"}
+
+OUTPUT ERRORE:
+{"status":"error","message":"chiusura non consentita (saldo > 0 o conto non trovato)"}
+{"status":"error","message":"iban mancante"}
+
+---------------------------------------------------------------------
+9. lista_conti
+---------------------------------------------------------------------
+INPUT:
+{
+  "cmd":   "lista_conti",
+  "token": "a3f8c2...64hexchars...e9b1"
+}
+
+OUTPUT OK:
+{
+  "status": "ok",
+  "data": [
+    {
+      "id": 1,
+      "iban": "IT600123456789000000000001",
+      "id_utente": 1,
+      "saldo": 1500.00,
+      "tipo": "corrente",
+      "data_apertura": "2024-01-15 10:35:00"
+    },
+    {
+      "id": 2,
+      "iban": "IT600123456789000000000002",
+      "id_utente": 1,
+      "saldo": 3000.00,
+      "tipo": "risparmio",
+      "data_apertura": "2024-01-16 09:00:00"
+    }
+  ]
+}
+
+NOTA: ritorna array vuoto [] se l'utente non ha conti attivi.
+
+---------------------------------------------------------------------
+10. estratto_conto
+---------------------------------------------------------------------
+INPUT:
+{
+  "cmd":   "estratto_conto",
+  "token": "a3f8c2...64hexchars...e9b1",
+  "iban":  "IT600123456789000000000001"
+}
+
+OUTPUT OK:
+{
+  "status": "ok",
+  "data": {
+    "conto": {
+      "id": 1,
+      "iban": "IT600123456789000000000001",
+      "id_utente": 1,
+      "saldo": 1500.00,
+      "tipo": "corrente",
+      "data_apertura": "2024-01-15 10:35:00"
+    },
+    "transazioni": [
+      {
+        "id": 3,
+        "tipo": "bonifico_uscita",
+        "importo": 200.00,
+        "descrizione": "Affitto",
+        "data": "2024-01-17 14:00:00",
+        "iban_controparte": "IT600123456789000000000003"
+      },
+      {
+        "id": 1,
+        "tipo": "deposito",
+        "importo": 1700.00,
+        "descrizione": "Stipendio",
+        "data": "2024-01-15 11:00:00",
+        "iban_controparte": ""
+      }
+    ]
+  }
+}
+
+VALORI tipo transazione:
+  "deposito"          → TX_DEPOSITO
+  "prelievo"          → TX_PRELIEVO
+  "bonifico_uscita"   → TX_BONIFICO_OUT
+  "bonifico_entrata"  → TX_BONIFICO_IN
+
+NOTA: le transazioni sono ordinate dal più recente al più vecchio
+(inserimento in testa alla lista collegata).
+
+OUTPUT ERRORE:
+{"status":"error","message":"conto non trovato"}
+{"status":"error","message":"iban mancante"}
+
+---------------------------------------------------------------------
+11. deposita
+---------------------------------------------------------------------
+INPUT:
+{
+  "cmd":         "deposita",
+  "token":       "a3f8c2...64hexchars...e9b1",
+  "iban":        "IT600123456789000000000001",
+  "importo":     500.00,
+  "descrizione": "Stipendio gennaio"
+}
+
+NOTA: "descrizione" è opzionale (stringa vuota se omessa).
+      "importo" deve essere > 0.
+
+OUTPUT OK:
+{
+  "status": "ok",
+  "data": {"saldo": 2000.00}
+}
+
+OUTPUT ERRORE:
+{"status":"error","message":"deposito non consentito"}
+{"status":"error","message":"conto non trovato"}
+{"status":"error","message":"parametri mancanti"}
+
+---------------------------------------------------------------------
+12. preleva
+---------------------------------------------------------------------
+INPUT:
+{
+  "cmd":         "preleva",
+  "token":       "a3f8c2...64hexchars...e9b1",
+  "iban":        "IT600123456789000000000001",
+  "importo":     100.00,
+  "descrizione": "Spesa supermercato"
+}
+
+NOTA: "importo" deve essere > 0 e <= saldo disponibile.
+
+OUTPUT OK:
+{
+  "status": "ok",
+  "data": {"saldo": 1900.00}
+}
+
+OUTPUT ERRORE:
+{"status":"error","message":"fondi insufficienti"}
+{"status":"error","message":"conto non trovato"}
+{"status":"error","message":"parametri mancanti"}
+
+---------------------------------------------------------------------
+13. bonifico
+---------------------------------------------------------------------
+INPUT:
+{
+  "cmd":               "bonifico",
+  "token":             "a3f8c2...64hexchars...e9b1",
+  "iban_mittente":     "IT600123456789000000000001",
+  "iban_destinatario": "IT600123456789000000000003",
+  "importo":           200.00,
+  "descrizione":       "Affitto"
+}
+
+NOTA: iban_mittente deve appartenere all'utente autenticato.
+      iban_destinatario può essere di qualsiasi utente nel sistema.
+      "descrizione" è opzionale.
+
+OUTPUT OK:
+{
+  "status": "ok",
+  "data": {"saldo": 1700.00}
+}
+
+NOTA: il saldo restituito è quello del conto mittente dopo il bonifico.
+
+OUTPUT ERRORE:
+{"status":"error","message":"fondi insufficienti"}
+{"status":"error","message":"IBAN destinatario non trovato"}
+{"status":"error","message":"conto mittente non trovato"}
+{"status":"error","message":"parametri mancanti"}
+
+---------------------------------------------------------------------
+14. statistiche
+---------------------------------------------------------------------
+INPUT:
+{
+  "cmd":   "statistiche",
+  "token": "a3f8c2...64hexchars...e9b1"
+}
+
+OUTPUT OK:
+{
+  "status": "ok",
+  "data": {
+    "n_conti":                  2,
+    "saldo_totale":             4500.00,
+    "n_transazioni":            12,
+    "totale_depositi":          6000.00,
+    "totale_prelievi":          800.00,
+    "totale_bonifici_uscita":   700.00,
+    "totale_bonifici_entrata":  0.00
+  }
+}
+
+NOTA: aggrega tutti i conti attivi dell'utente autenticato.
+
+OUTPUT ERRORE:
+{"status":"error","message":"sessione non valida o scaduta"}
+
+=====================================================================
+  ERRORI COMUNI A TUTTI I COMANDI
+=====================================================================
+
+{"status":"error","message":"sessione non valida o scaduta"}
+  → token mancante, non esistente, o scaduto per inattività (>1h).
+
+{"status":"error","message":"token mancante"}
+  → campo "token" non presente nel JSON.
+
+{"status":"error","message":"campo cmd mancante"}
+  → JSON ricevuto senza campo "cmd".
+
+{"status":"error","message":"comando sconosciuto"}
+  → valore "cmd" non corrisponde a nessuno dei 14 comandi.
+
+{"status":"error","message":"nessun input ricevuto"}
+  → stdin chiuso prima di ricevere dati.
+
+=====================================================================
+  ESEMPIO FLUSSO COMPLETO (Node.js)
+=====================================================================
+
+const { spawn } = require('child_process');
+
+function eseguiComando(payload) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('./banca_core');
+    let output = '';
+    proc.stdout.on('data', d => output += d);
+    proc.on('close', () => resolve(JSON.parse(output)));
+    proc.stdin.write(JSON.stringify(payload) + '\n');
+    proc.stdin.end();
+  });
+}
+
+// Esempio: login
+const risposta = await eseguiComando({
+  cmd: 'login',
+  username: 'mario_rossi',
+  password: 'miaPassword123'
+});
+// risposta.data.token → token per comandi successivi
+=====================================================================

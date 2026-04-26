@@ -1,0 +1,106 @@
+=====================================================================
+  crypto.c — Cifratura password con AES-128-CBC (OpenSSL)
+=====================================================================
+
+SCOPO
+-----
+Cifra e decifra le password degli utenti prima di salvarle su CSV.
+Usa OpenSSL EVP (high-level API), AES-128 in modalità CBC con PKCS7
+padding. La chiave (16 byte) e il vettore di inizializzazione IV (16
+byte) sono costanti definite in tipi.h come AES_KEY e AES_IV.
+
+---------------------------------------------------------------------
+FUNZIONI
+---------------------------------------------------------------------
+
+bytes_to_hex(bytes, len, hex_out)
+  Converte un array di byte in stringa esadecimale lowercase.
+  Algoritmo: ciclo su ogni byte, sprintf con formato "%02x".
+  Output: len*2 caratteri + null terminator.
+
+hex_to_bytes(hex, bytes_out, len)
+  Inverso di bytes_to_hex. Legge 2 char alla volta con sscanf "%02x".
+  Usato in password_decrypt per ricostruire i byte cifrati dal CSV.
+
+---------------------------------------------------------------------
+
+password_encrypt(password, hex_out)
+  Cifra la stringa password con AES-128-CBC.
+
+  Flusso OpenSSL EVP:
+    1. EVP_CIPHER_CTX_new()       — alloca contesto cifratura
+    2. EVP_EncryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, key, iv)
+                                  — inizializza AES-128-CBC con key+iv
+    3. EVP_EncryptUpdate(...)     — cifra i byte in input
+    4. EVP_EncryptFinal_ex(...)   — aggiunge il padding PKCS7 finale
+    5. EVP_CIPHER_CTX_free(ctx)   — libera memoria contesto
+
+  Padding PKCS7: se la password è N byte, l'output è:
+    - 16 byte se N in [1..15]
+    - 32 byte se N in [16..31]
+  Output esadecimale: max 64 char (32 byte → 64 hex).
+  Buffer cipher[48] è sufficiente per password fino a 31 char.
+
+  RIGA CHIAVE (riga ~28):
+    EVP_EncryptUpdate(ctx, cipher, &out_len,
+                      (const uint8_t *)password, (int)strlen(password));
+  Passiamo la lunghezza esatta della password (senza null): il padding
+  PKCS7 viene aggiunto da EVP_EncryptFinal_ex, non manualmente.
+
+---------------------------------------------------------------------
+
+password_decrypt(hex_in, password_out)
+  Decifra il hex salvato su CSV → password in chiaro.
+
+  Flusso OpenSSL EVP:
+    1. Calcola cipher_len = strlen(hex_in) / 2
+    2. hex_to_bytes → ricostruisce byte cifrati
+    3. EVP_DecryptInit_ex + EVP_DecryptUpdate + EVP_DecryptFinal_ex
+       — rimuove automaticamente il padding PKCS7
+    4. Copia plain in password_out con lunghezza esatta (out_len + final_len)
+
+  RIGA CHIAVE (riga ~51):
+    EVP_DecryptFinal_ex(ctx, plain + out_len, &final_len);
+  EVP rimuove il padding PKCS7 qui; final_len tiene conto dei byte
+  restituiti dopo la rimozione del padding.
+
+---------------------------------------------------------------------
+
+password_verifica(password, hex_salvato)
+  Decifra hex_salvato, confronta con password in chiaro.
+  Ritorna 1 se uguali, 0 altrimenti.
+  Usato in utente_login() e utente_cambia_password().
+
+---------------------------------------------------------------------
+STRUTTURE DATI / ALGORITMI
+---------------------------------------------------------------------
+
+AES-128-CBC (Cipher Block Chaining):
+  - Blocco 16 byte, chiave 16 byte (128 bit)
+  - CBC: ogni blocco plaintext viene XORato con il ciphertext del
+    blocco precedente prima di essere cifrato. Il primo blocco usa IV.
+  - Questo differenzia CBC da ECB (precedente implementazione): blocchi
+    identici producono ciphertext diversi grazie all'effetto a catena.
+
+PKCS7 padding:
+  - Riempie l'ultimo blocco incompleto con byte di valore N (dove N è
+    il numero di byte di padding). Es: 3 byte mancanti → "03 03 03".
+  - Garantisce che l'output sia sempre multiplo di 16 byte.
+
+EVP_CIPHER_CTX:
+  - Struttura opaca OpenSSL che mantiene lo stato della cifratura.
+  - Allocata sullo heap (EVP_CIPHER_CTX_new), liberata dopo uso.
+  - Permette di cifrare dati in più chiamate Update consecutive.
+
+---------------------------------------------------------------------
+DIPENDENZE
+---------------------------------------------------------------------
+  #include <openssl/evp.h>   — API EVP OpenSSL
+  tipi.h                     — AES_KEY, AES_IV (costanti 16 byte)
+  Linker flag: -lcrypto
+
+NOTA: La chiave e l'IV sono costanti a compile-time in tipi.h.
+In produzione si userebbe una chiave derivata (PBKDF2/bcrypt) e un
+IV casuale per sessione. Per un sistema bancario reale si adotterebbe
+hashing irreversibile (Argon2, bcrypt) invece di cifratura simmetrica.
+=====================================================================

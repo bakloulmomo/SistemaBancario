@@ -1,2 +1,3 @@
 id,username,password_hex,nome,cognome,email,telefono,data_nascita,data_registrazione,attivo
-1,mario,0c36c809541d1ed83489723727b0e17659ecc8d02d221022df3eb988a95d7fc2,Mario,Rossi,mario@example.com,333111,1990-01-15,2026-04-23 11:56:21,1
+1,mario_test,63e1bd9e60584956ccab8786ee0596f8,Mario,Rossi,mario_test@cbank.local,0,1996-01-01,2026-04-26 22:32:29,1
+2,mario_rossi,b802242772e3f516acbdfb7a29a97000,Mario,Rossi,mario_rossi@cbank.local,0,1996-01-01,2026-04-26 22:41:14,1

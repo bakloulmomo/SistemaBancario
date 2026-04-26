@@ -1,0 +1,118 @@
+=====================================================================
+  conti.c — Gestione conti bancari: apertura, chiusura, ricerca
+=====================================================================
+
+SCOPO
+-----
+Gestisce l'array dinamico di conti nella StatoBanca. Ogni conto ha
+un IBAN generato automaticamente, appartiene a un utente, mantiene
+il saldo corrente e punta alla testa di una lista collegata di
+transazioni (Transazione*).
+
+---------------------------------------------------------------------
+COSTANTE
+---------------------------------------------------------------------
+
+#define CAP_INIZIALE 16
+  Stessa strategia di crescita geometrica di utenti.c.
+
+---------------------------------------------------------------------
+FUNZIONI
+---------------------------------------------------------------------
+
+conti_init(banca)
+  Alloca array iniziale malloc(16 * sizeof(Conto)).
+
+conti_libera(banca)
+  Itera su tutti i conti e libera la lista collegata di transazioni
+  per ognuno prima di liberare l'array.
+  RIGA CHIAVE (riga ~17-18):
+    for (int i = 0; i < banca->n_conti; i++)
+        transazioni_libera(banca->conti[i].transazioni);
+  Critico: se mancasse questo loop si avrebbe memory leak su ogni
+  lista di transazioni (allocate con malloc in transazioni.c).
+
+---------------------------------------------------------------------
+
+conto_apri(banca, id_utente, tipo) → int id_conto
+  Apre un nuovo conto per l'utente specificato.
+
+  PASSI:
+    1. Ridimensiona array se necessario (stessa logica di utenti.c).
+    2. Punta a &banca->conti[n_conti], memset a zero.
+    3. Assegna id = prossimo_id_conto++.
+    4. RIGA CHIAVE (riga ~43):
+         genera_iban(c->id, c->iban);
+       Genera IBAN nel formato IT60 + ABI(5) + CAB(5) + id zero-padded
+       a 12 cifre. Univocità garantita dall'id auto-increment.
+    5. data_ora_corrente() per data_apertura.
+    6. saldo = 0.0, attivo = 1, transazioni = NULL.
+  Ritorna id_conto (>= 1) oppure -1 se realloc fallisce.
+
+---------------------------------------------------------------------
+
+conto_chiudi(banca, id_utente, iban) → int (0/1)
+  Soft delete: imposta attivo=0.
+  Regole di business:
+    - Il conto deve esistere.
+    - Deve appartenere all'utente autenticato (c->id_utente == id_utente).
+    - RIGA CHIAVE (riga ~54):
+        if (c->saldo > 0.0) return 0;
+      Non si può chiudere un conto con saldo positivo. Protezione
+      contro perdita accidentale di denaro.
+  Nota: il confronto saldo > 0.0 non gestisce saldo negativo (scoperto).
+  In produzione si userebbe saldo != 0.0.
+
+---------------------------------------------------------------------
+
+conto_cerca_iban(banca, iban) → Conto*
+  Ricerca lineare O(n) sull'array.
+  Controlla solo conti con attivo==1.
+  Confronto con strcmp su stringa IBAN (max 34 char).
+  Ritorna puntatore diretto o NULL.
+  Usata in: deposita, preleva, bonifico, estratto_conto, chiudi_conto.
+
+---------------------------------------------------------------------
+
+conto_to_json(c, out, outsize)
+  Serializza un Conto in JSON.
+  RIGA CHIAVE (riga ~79):
+    c->tipo == CONTO_CORRENTE ? "corrente" : "risparmio"
+  Converte l'enum TipoConto in stringa leggibile per il frontend.
+
+conti_utente_to_json(banca, id_utente, out, outsize)
+  Costruisce un array JSON "[{...},{...},...]" con tutti i conti
+  attivi dell'utente specificato.
+  RIGA CHIAVE (riga ~90):
+    written += snprintf(out + written, outsize - written, "%s", tmp);
+  Pattern "tracked write": accumula i byte scritti in `written` per
+  non riscrivere dall'inizio ad ogni iterazione e gestire il limite
+  del buffer (outsize - written). Evita buffer overflow.
+
+---------------------------------------------------------------------
+STRUTTURE DATI
+---------------------------------------------------------------------
+
+Lista collegata (Transazione*):
+  Ogni Conto ha un campo `transazioni` che punta alla testa di una
+  lista singolarmente collegata. Le transazioni vengono inserite in
+  testa (O(1)) — l'ordine è quindi dal più recente al più vecchio.
+
+Array dinamico (Conto*):
+  Stessa strategia di utenti.c. I puntatori ai conti si invalidano
+  dopo realloc in conto_apri(): le funzioni che aprono un conto e
+  poi vogliono il puntatore devono cercarlo di nuovo (come in main.c,
+  cmd_apri_conto).
+
+IBAN:
+  IT60 + ABI(5) + CAB(5) + CC(12) = 24 char.
+  Memorizzato come stringa in iban[35] (margine per null e varianti).
+  Generato deterministicamente da id_conto — non casuale.
+
+---------------------------------------------------------------------
+DIPENDENZE
+---------------------------------------------------------------------
+  utils.h       — genera_iban, data_ora_corrente
+  transazioni.h — transazioni_libera
+  tipi.h        — StatoBanca, Conto, TipoConto
+=====================================================================

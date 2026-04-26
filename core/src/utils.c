@@ -265,6 +265,41 @@ void csv_unescape(const char *in, char *out, int outsize) {
     out[j] = '\0';
 }
 
+/* ---- Ricerca case-insensitive ---- */
+
+int str_contains_ci(const char *haystack, const char *needle) {
+    if (!needle || !needle[0]) return 1;
+    int nlen = (int)strlen(needle);
+    for (int i = 0; haystack[i]; i++) {
+        int j;
+        for (j = 0; j < nlen && haystack[i+j]; j++) {
+            if (tolower((unsigned char)haystack[i+j]) != tolower((unsigned char)needle[j]))
+                break;
+        }
+        if (j == nlen) return 1;
+    }
+    return 0;
+}
+
+/* Genera username da nome+cognome: "abcd_wxyz_NNN" (prime 4 lettere, 3 cifre random) */
+void genera_username(const char *nome, const char *cognome, int suffisso, char *out, int outsize) {
+    char p1[5] = {0}, p2[5] = {0};
+    int i;
+    for (i = 0; i < 4 && nome[i]; i++)
+        p1[i] = (char)tolower((unsigned char)nome[i]);
+    for (i = 0; i < 4 && cognome[i]; i++)
+        p2[i] = (char)tolower((unsigned char)cognome[i]);
+    snprintf(out, outsize, "%s_%s_%03d", p1, p2, suffisso % 1000);
+}
+
+/* Rimuove tutte le sessioni di un dato utente */
+void sessioni_rimuovi_utente(StatoBanca *banca, int id_utente) {
+    for (int i = banca->n_sessioni - 1; i >= 0; i--) {
+        if (banca->sessioni[i].id_utente == id_utente)
+            banca->sessioni[i] = banca->sessioni[--banca->n_sessioni];
+    }
+}
+
 /* ---- Statistiche ---- */
 
 void stampa_barre(double valore, double max_val, int larghezza, char *out) {

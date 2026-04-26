@@ -1,0 +1,9 @@
+{
+  "_hash": "6OOsU2z5tN43JB0dMxfeTH2UJPx-JpjAOiofMDrS4rw",
+  "project": {
+    "rootDir": "/workspaces/SistemaBancario/client"
+  },
+  "versions": {
+    "nuxt": "3.21.2"
+  }
+}

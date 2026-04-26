@@ -104,8 +104,7 @@ int utente_aggiorna_profilo(StatoBanca *banca, int id_utente,
     return 1;
 }
 
-int utente_cambia_password(StatoBanca *banca, int id_utente,
-                            const char *vecchia_pw, const char *nuova_pw) {
+int utente_cambia_password(StatoBanca *banca, int id_utente, const char *vecchia_pw, const char *nuova_pw) {
     Utente *u = utente_cerca_id(banca, id_utente);
     if (!u) return 0;
 

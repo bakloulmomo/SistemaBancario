@@ -3,34 +3,14 @@
 
 #include <stdint.h>
 
-/*
- * AES-128 ECB — cifratura/decifratura di un singolo blocco (16 byte).
- * Usato per cifrare le password prima di salvarle su CSV.
- */
-void aes128_encrypt(const uint8_t key[16],
-                    const uint8_t plaintext[16],
-                    uint8_t       ciphertext[16]);
-
-void aes128_decrypt(const uint8_t key[16],
-                    const uint8_t ciphertext[16],
-                    uint8_t       plaintext[16]);
-
-/*
- * Cifra una stringa di password (max 32 char) con AES-128 ECB
- * e restituisce la rappresentazione esadecimale (max 65 char).
- */
+/* Cifra password (max 31 char) con AES-128-CBC via OpenSSL.
+ * Output: hex string, max 96 char (48 byte cifrati). */
 void password_encrypt(const char *password, char *hex_out);
 
-/*
- * Decifra un hash esadecimale e restituisce la password originale.
- * Usato internamente per la verifica al login.
- */
+/* Decifra hex → password in chiaro. Usato internamente per verifica. */
 void password_decrypt(const char *hex_in, char *password_out);
 
-/*
- * Confronta una password in chiaro con il suo hash salvato.
- * Ritorna 1 se corrispondono, 0 altrimenti.
- */
+/* Ritorna 1 se password corrisponde all'hex salvato, 0 altrimenti. */
 int password_verifica(const char *password, const char *hex_salvato);
 
 /* Converte bytes in stringa esadecimale */

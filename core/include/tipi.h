@@ -11,6 +11,7 @@
 #define BANCA_ABI               "01234"
 #define BANCA_CAB               "56789"
 #define AES_KEY                 "BancaSegreta_K16"  /* 16 byte esatti */
+#define AES_IV                  "BancaIV_16bytes!"  /* 16 byte esatti */
 
 /* ---- Enumerazioni ---- */
 
