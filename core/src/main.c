@@ -12,28 +12,28 @@
 #include "../include/crypto.h"
 
 /*
- * Protocollo: Node.js invia una riga JSON su stdin, il core risponde
- * con una riga JSON su stdout e poi termina.
- *
- * Comandi supportati:
- *   registra        — nome, cognome, eta, password, saldo_iniziale
- *   login           — username, password
- *   logout          — token
- *   profilo         — token
- *   aggiorna_profilo— token, nome, cognome
- *   cambia_password — token, vecchia_password, nuova_password
- *   lista_conti     — token
- *   estratto_conto  — token, iban
- *   preleva         — token, importo, descrizione
- *   invia           — token, iban_destinatario, importo, descrizione
- *   notifiche       — token
- *   cerca_utenti    — token, query
- *   elimina_account — token, password
+  protocollo: Node.js invia una riga JSON su stdin, il core risponde
+  con una riga JSON su stdout e poi finisce il tutto
+ 
+  comandi usati nel main(), (usati funzioni):
+    registra        — nome, cognome, eta, password, saldo_iniziale
+    login           — username, password
+    logout          — token
+    profilo         — token
+    aggiorna_profilo — token, nome, cognome
+    cambia_password — token, vecchia_password, nuova_password
+    lista_conti     — token
+    estratto_conto  — token, iban
+    preleva         — token, importo, descrizione
+    invia           — token, iban_destinatario, importo, descrizione
+    notifiche       — token
+    cerca_utenti    — token, query
+    elimina_account — token, password
  */
 
 StatoBanca banca;
 
-/* Verifica token, ritorna id_utente o -1 */
+
 int verifica_sessione(const char *json, char *token_out) {
     if (!json_get_str(json, "token", token_out, 65)) {
         char out[256];
@@ -60,7 +60,7 @@ Conto *conto_primario(int id_utente) {
     return NULL;
 }
 
-/* ---- Handler per ogni comando ---- */
+
 
 void cmd_registra(const char *json) {
     char nome[64], cognome[64], password[64];
@@ -85,7 +85,7 @@ void cmd_registra(const char *json) {
 
     json_get_num(json, "saldo_iniziale", &saldo_d);
 
-    /* Usa username fornito oppure genera automaticamente */
+
     char username[64] = {0};
     json_get_str(json, "username", username, sizeof(username));
 
@@ -107,7 +107,7 @@ void cmd_registra(const char *json) {
         return;
     }
 
-    /* Data nascita approssimata dall'eta */
+
     int anno = 1900 + (int)time(NULL) / 31557600 + 70 - eta;
     /* Calcolo corretto anno corrente */
     time_t t = time(NULL);
@@ -128,7 +128,7 @@ void cmd_registra(const char *json) {
     }
     salva_utenti(&banca);
 
-    /* Apri conto corrente automaticamente */
+
     int id_conto = conto_apri(&banca, id, CONTO_CORRENTE);
     if (id_conto < 0) {
         json_errore("apertura conto fallita", out, sizeof(out));
@@ -141,13 +141,12 @@ void cmd_registra(const char *json) {
         if (banca.conti[i].id == id_conto) { c = &banca.conti[i]; break; }
     }
 
-    /* Deposito iniziale */
     if (saldo_d > 0.0 && c)
         deposita(&banca, c->iban, saldo_d, "Deposito iniziale");
 
     salva_dati(&banca);
 
-    /* Auto-login */
+
     char token[65];
     utente_login(&banca, username, password, token);
     salva_sessioni(&banca);
@@ -233,7 +232,7 @@ void cmd_profilo(const char *json) {
     char utente_json[1024];
     utente_to_json(u, utente_json, sizeof(utente_json));
 
-    /* Inietta iban e saldo nel JSON utente */
+
     char data_json[2048];
     snprintf(data_json, sizeof(data_json),
         "{\"utente\":%s,\"iban\":\"%s\",\"saldo\":%.2f}",
@@ -374,6 +373,7 @@ void cmd_preleva(const char *json) {
 
 void cmd_invia(const char *json) {
     char token[65], iban_dest[35], descrizione[128];
+
     double importo = 0.0;
     char out[512];
 
@@ -463,7 +463,6 @@ void cmd_notifiche(const char *json) {
     arr[pos++] = ']';
     arr[pos]   = '\0';
 
-    /* Rimuovi le notifiche lette dall'array */
     if (nuove > 0) {
         int w = 0;
         for (int i = 0; i < banca.n_notifiche; i++) {
@@ -553,16 +552,15 @@ void cmd_elimina_account(const char *json) {
         return;
     }
 
-    /* Disattiva tutti i conti dell'utente */
+
     for (int i = 0; i < banca.n_conti; i++) {
         if (banca.conti[i].id_utente == id)
             banca.conti[i].attivo = 0;
     }
 
-    /* Disattiva utente */
     u->attivo = 0;
 
-    /* Rimuovi tutte le sessioni */
+
     sessioni_rimuovi_utente(&banca, id);
 
     salva_dati(&banca);
@@ -573,9 +571,9 @@ void cmd_elimina_account(const char *json) {
     puts(out);
 }
 
-/* ---- Entry point ---- */
 
-int main(void) {
+// ENTRYPOINT
+int main() {
     srand((unsigned)time(NULL));
 
     memset(&banca, 0, sizeof(StatoBanca));

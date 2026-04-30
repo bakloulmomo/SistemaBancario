@@ -6,7 +6,6 @@
 #include "../include/utils.h"
 #include "../include/tipi.h"
 
-/* ---- Generatori ---- */
 
 void genera_iban(int id_conto, char *iban_out) {
     /* Formato: IT60 + ABI(5) + CAB(5) + CC(12 cifre zero-padded) */
@@ -14,7 +13,6 @@ void genera_iban(int id_conto, char *iban_out) {
 }
 
 void genera_token(char *token_out) {
-    /* Token da 64 char hex (256 bit di entropia pseudocasuale) */
     for (int i = 0; i < 64; i++) {
         int r = rand() % 16;
         token_out[i] = "0123456789abcdef"[r];
@@ -34,7 +32,6 @@ void data_corrente(char *out) {
     strftime(out, 12, "%Y-%m-%d", tm_info);
 }
 
-/* ---- Gestione sessioni ---- */
 
 int sessione_crea(StatoBanca *banca, int id_utente, char *token_out) {
     /* Rimuovi sessioni scadute prima di aggiungere */
@@ -91,7 +88,7 @@ void sessioni_pulisci(StatoBanca *banca) {
     }
 }
 
-/* ---- Coda notifiche (FIFO) ---- */
+// DSA per notifiche
 
 void coda_enqueue(CodaNotifiche *coda, int id_utente, const char *msg) {
     NodoCoda *nodo = (NodoCoda *)malloc(sizeof(NodoCoda));
@@ -132,7 +129,6 @@ void coda_libera(CodaNotifiche *coda) {
     coda->n = 0;
 }
 
-/* ---- JSON builder ---- */
 
 void json_ok(const char *data_json, char *out, int outsize) {
     if (data_json && data_json[0] != '\0')
@@ -145,13 +141,7 @@ void json_errore(const char *messaggio, char *out, int outsize) {
     snprintf(out, outsize, "{\"status\":\"error\",\"message\":\"%s\"}", messaggio);
 }
 
-/* ---- JSON parser (input da Node.js) ---- */
 
-/*
- * Cerca "chiave":"valore" nel JSON piatto.
- * Gestisce solo valori stringa (con virgolette).
- * Ritorna 1 se trovato, 0 altrimenti.
- */
 int json_get_str(const char *json, const char *chiave,
                  char *val_out, int val_size) {
     char pattern[128];
@@ -196,10 +186,6 @@ int json_get_str(const char *json, const char *chiave,
     return 1;
 }
 
-/*
- * Cerca "chiave":numero nel JSON piatto.
- * Ritorna 1 se trovato, 0 altrimenti.
- */
 int json_get_num(const char *json, const char *chiave, double *val_out) {
     char pattern[128];
     snprintf(pattern, sizeof(pattern), "\"%s\"", chiave);
@@ -219,8 +205,6 @@ int json_get_num(const char *json, const char *chiave, double *val_out) {
 
     return sscanf(pos, "%lf", val_out) == 1 ? 1 : 0;
 }
-
-/* ---- Utilità stringhe ---- */
 
 
 void str_trim(char *s) {
@@ -266,7 +250,6 @@ void csv_unescape(const char *in, char *out, int outsize) {
     out[j] = '\0';
 }
 
-/* ---- Ricerca case-insensitive ---- */
 
 int str_contains_ci(const char *haystack, const char *needle) {
     if (!needle || !needle[0]) return 1;
@@ -282,7 +265,7 @@ int str_contains_ci(const char *haystack, const char *needle) {
     return 0;
 }
 
-/* Genera username da nome+cognome: "abcd_wxyz_NNN" (prime 4 lettere, 3 cifre random) */
+// genera username da nome+cognome, (se l'utente non lo sceglie)
 void genera_username(const char *nome, const char *cognome, int suffisso, char *out, int outsize) {
     char p1[5] = {0}, p2[5] = {0};
     int i;
@@ -293,7 +276,7 @@ void genera_username(const char *nome, const char *cognome, int suffisso, char *
     snprintf(out, outsize, "%s_%s_%03d", p1, p2, suffisso % 1000);
 }
 
-/* Rimuove tutte le sessioni di un dato utente */
+// rimuove tutte le sessioni di un utente
 void sessioni_rimuovi_utente(StatoBanca *banca, int id_utente) {
     for (int i = banca->n_sessioni - 1; i >= 0; i--) {
         if (banca->sessioni[i].id_utente == id_utente)
