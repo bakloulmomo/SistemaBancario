@@ -10,6 +10,7 @@ app.use('/api/auth',         require('./routes/auth'));
 app.use('/api/conti',        require('./routes/conti'));
 app.use('/api/transazioni',  require('./routes/transazioni'));
 app.use('/api/utenti',       require('./routes/utenti'));
+app.use('/api/notifiche',    require('./routes/notifiche'));
 app.use('/api/chatbot',      require('./chatbot/routes'));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));

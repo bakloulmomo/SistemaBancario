@@ -87,6 +87,13 @@ typedef struct {
     int       n;
 } CodaNotifiche;
 
+/* Notifica persistente su file */
+typedef struct {
+    int  id_utente;
+    char messaggio[256];
+    char timestamp[20];
+} Notifica;
+
 /* ---- Stato globale della banca ---- */
 typedef struct {
     /* Array dinamici */
@@ -107,8 +114,13 @@ typedef struct {
     int prossimo_id_conto;
     int prossimo_id_transazione;
 
-    /* Coda notifiche pendenti */
+    /* Coda notifiche in-memory (legacy) */
     CodaNotifiche notifiche;
+
+    /* Notifiche persistenti */
+    Notifica *notifiche_arr;
+    int       n_notifiche;
+    int       cap_notifiche;
 } StatoBanca;
 
 #endif /* TIPI_H */

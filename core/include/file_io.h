@@ -7,6 +7,7 @@
 #define PATH_CONTI        "data/conti.csv"
 #define PATH_TRANSAZIONI  "data/transazioni.csv"
 #define PATH_SESSIONI     "data/sessioni.csv"
+#define PATH_NOTIFICHE    "data/notifiche.csv"
 
 /*
  * Carica tutti i dati da CSV all'avvio.
@@ -34,5 +35,9 @@ int carica_sessioni(StatoBanca *banca);
 
 /* Salva sessioni attive */
 int salva_sessioni(const StatoBanca *banca);
+
+/* Notifiche persistenti */
+int carica_notifiche(StatoBanca *banca);
+int salva_notifiche(const StatoBanca *banca);
 
 #endif /* FILE_IO_H */

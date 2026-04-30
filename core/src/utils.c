@@ -300,15 +300,6 @@ void sessioni_rimuovi_utente(StatoBanca *banca, int id_utente) {
     }
 }
 
-/* ---- Statistiche ---- */
-
-void stampa_barre(double valore, double max_val, int larghezza, char *out) {
-    int barre = (max_val > 0) ? (int)((valore / max_val) * larghezza) : 0;
-    int i;
-    for (i = 0; i < barre && i < larghezza; i++)
-        out[i] = '|';
-    out[i] = '\0';
-}
 
 void statistiche_json(StatoBanca *banca, int id_utente,
                       char *out, int outsize) {

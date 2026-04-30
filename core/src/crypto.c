@@ -1,12 +1,21 @@
 #include <string.h>
 #include <stdio.h>
-#include <openssl/evp.h>
+#include <openssl/evp.h> ///
 #include "../include/crypto.h"
 #include "../include/tipi.h"
 
+// gestisce cifratura/crittografia per tutte le altre funzioni
+
+// bytes = array di byte cifrati (output di AES)
+// len = byte da convertire
+// hex_out = stringa che viene in input da criptare
+// puntatore alla posizione del buffer dove scrivere
+
+// Dopo aver cifrato password, salva i byte in stringa
 void bytes_to_hex(const uint8_t *bytes, int len, char *hex_out) {
     for (int i = 0; i < len; i++)
-        sprintf(hex_out + i * 2, "%02x", bytes[i]);
+        sprintf(hex_out + i * 2, "%02x", bytes[i]); // ogni byte = 2 char
+    // 02x, x = esadecimale minuscolo, 02 = minimo 2 cifre (es. 9 salva "09" non "9")
     hex_out[len * 2] = '\0';
 }
 
@@ -22,6 +31,7 @@ void password_encrypt(const char *password, char *hex_out) {
     const uint8_t *key = (const uint8_t *)AES_KEY;
     const uint8_t *iv  = (const uint8_t *)AES_IV;
     uint8_t cipher[48];
+
     int out_len = 0, final_len = 0;
 
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
@@ -59,3 +69,4 @@ int password_verifica(const char *password, const char *hex_salvato) {
     password_decrypt(hex_salvato, decifrata);
     return strcmp(password, decifrata) == 0 ? 1 : 0;
 }
+

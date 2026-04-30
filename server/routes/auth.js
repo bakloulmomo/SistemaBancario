@@ -4,7 +4,6 @@ const { requireAuth } = require('../middleware/auth');
 
 const router = Router();
 
-/* Registra: nome, cognome, eta, password, saldo_iniziale */
 router.post('/registra', async (req, res) => {
   const { username, nome, cognome, eta, password, saldo_iniziale = 0 } = req.body || {};
   if (!nome || !cognome || !eta || !password)

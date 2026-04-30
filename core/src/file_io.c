@@ -289,20 +289,78 @@ int carica_sessioni(StatoBanca *banca) {
     return 1;
 }
 
+/* ---- Notifiche ---- */
+
+int salva_notifiche(const StatoBanca *banca) {
+    FILE *f = fopen(PATH_NOTIFICHE, "w");
+    if (!f) return 0;
+
+    fprintf(f, "id_utente,messaggio,timestamp\n");
+
+    for (int i = 0; i < banca->n_notifiche; i++) {
+        const Notifica *n = &banca->notifiche_arr[i];
+        char msg_esc[512];
+        csv_escape(n->messaggio, msg_esc, sizeof(msg_esc));
+        fprintf(f, "%d,%s,%s\n", n->id_utente, msg_esc, n->timestamp);
+    }
+
+    fclose(f);
+    return 1;
+}
+
+int carica_notifiche(StatoBanca *banca) {
+    FILE *f = fopen(PATH_NOTIFICHE, "r");
+    if (!f) return 1;
+
+    char riga[512];
+    fgets(riga, sizeof(riga), f);
+
+    while (fgets(riga, sizeof(riga), f)) {
+        str_trim(riga);
+        if (!riga[0]) continue;
+
+        if (banca->n_notifiche >= banca->cap_notifiche) {
+            banca->cap_notifiche = banca->cap_notifiche ? banca->cap_notifiche * 2 : 64;
+            banca->notifiche_arr = (Notifica *)realloc(banca->notifiche_arr,
+                                       banca->cap_notifiche * sizeof(Notifica));
+        }
+
+        Notifica *n = &banca->notifiche_arr[banca->n_notifiche];
+        memset(n, 0, sizeof(Notifica));
+
+        char buf[512];
+        strncpy(buf, riga, sizeof(buf) - 1);
+
+        char *tok;
+        tok = strtok(buf, ","); if (!tok) continue; n->id_utente = atoi(tok);
+        char msg_esc[512] = {0};
+        tok = strtok(NULL, ","); if (!tok) continue; strncpy(msg_esc, tok, 511);
+        tok = strtok(NULL, ","); if (tok) strncpy(n->timestamp, tok, 19);
+
+        csv_unescape(msg_esc, n->messaggio, sizeof(n->messaggio));
+        banca->n_notifiche++;
+    }
+
+    fclose(f);
+    return 1;
+}
+
 /* ---- Funzioni aggregate ---- */
 
 int carica_dati(StatoBanca *banca) {
     if (!carica_utenti(banca))      return 0;
     if (!carica_conti(banca))       return 0;
     if (!carica_transazioni(banca)) return 0;
-    carica_sessioni(banca); /* Sessioni non critiche */
+    carica_sessioni(banca);
+    carica_notifiche(banca);
     return 1;
 }
 
 int salva_dati(const StatoBanca *banca) {
-    if (!salva_utenti(banca))     return 0;
-    if (!salva_conti(banca))      return 0;
+    if (!salva_utenti(banca))      return 0;
+    if (!salva_conti(banca))       return 0;
     if (!salva_transazioni(banca)) return 0;
     salva_sessioni(banca);
+    salva_notifiche(banca);
     return 1;
 }

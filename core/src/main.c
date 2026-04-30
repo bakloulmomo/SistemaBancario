@@ -26,6 +26,7 @@
  *   estratto_conto  — token, iban
  *   preleva         — token, importo, descrizione
  *   invia           — token, iban_destinatario, importo, descrizione
+ *   notifiche       — token
  *   cerca_utenti    — token, query
  *   elimina_account — token, password
  */
@@ -406,6 +407,28 @@ void cmd_invia(const char *json) {
     if (esito == -3) { json_errore("IBAN destinatario non trovato", out, sizeof(out)); puts(out); return; }
     if (esito < 0)   { json_errore("invio fallito", out, sizeof(out)); puts(out); return; }
 
+    /* Aggiungi notifica al destinatario */
+    Conto *dest_conto = conto_cerca_iban(&banca, iban_dest);
+    if (dest_conto) {
+        Utente *mittente_utente = utente_cerca_id(&banca, id);
+        if (mittente_utente) {
+            if (banca.n_notifiche >= banca.cap_notifiche) {
+                banca.cap_notifiche = banca.cap_notifiche ? banca.cap_notifiche * 2 : 64;
+                banca.notifiche_arr = (Notifica *)realloc(banca.notifiche_arr,
+                                           banca.cap_notifiche * sizeof(Notifica));
+            }
+            Notifica *n = &banca.notifiche_arr[banca.n_notifiche];
+            memset(n, 0, sizeof(Notifica));
+            n->id_utente = dest_conto->id_utente;
+            snprintf(n->messaggio, sizeof(n->messaggio),
+                     "Ricevuto €%.2f da %s %s",
+                     importo, mittente_utente->nome, mittente_utente->cognome);
+            char ts[20]; data_ora_corrente(ts);
+            strncpy(n->timestamp, ts, 19);
+            banca.n_notifiche++;
+        }
+    }
+
     salva_dati(&banca);
 
     char saldo_json[64];
@@ -413,6 +436,50 @@ void cmd_invia(const char *json) {
     json_ok(saldo_json, out, sizeof(out));
     puts(out);
 }
+
+void cmd_notifiche(const char *json) {
+    char token[65];
+    char out[MAX_JSON_OUT];
+
+    int id = verifica_sessione(json, token);
+    if (id < 0) return;
+
+    char arr[MAX_JSON_OUT - 64];
+    int pos = 0;
+    arr[pos++] = '[';
+    int first = 1;
+    int nuove = 0;
+
+    for (int i = 0; i < banca.n_notifiche; i++) {
+        Notifica *n = &banca.notifiche_arr[i];
+        if (n->id_utente != id) continue;
+        if (!first) arr[pos++] = ',';
+        first = 0;
+        pos += snprintf(arr + pos, sizeof(arr) - pos - 2,
+                        "{\"messaggio\":\"%s\",\"timestamp\":\"%s\"}",
+                        n->messaggio, n->timestamp);
+        nuove++;
+    }
+    arr[pos++] = ']';
+    arr[pos]   = '\0';
+
+    /* Rimuovi le notifiche lette dall'array */
+    if (nuove > 0) {
+        int w = 0;
+        for (int i = 0; i < banca.n_notifiche; i++) {
+            if (banca.notifiche_arr[i].id_utente != id)
+                banca.notifiche_arr[w++] = banca.notifiche_arr[i];
+        }
+        banca.n_notifiche = w;
+        salva_notifiche(&banca);
+    }
+
+    char body[MAX_JSON_OUT];
+    snprintf(body, sizeof(body), "{\"notifiche\":%s}", arr);
+    json_ok(body, out, sizeof(out));
+    puts(out);
+}
+
 
 void cmd_cerca_utenti(const char *json) {
     char token[65], query[128];
@@ -547,6 +614,7 @@ int main(void) {
     else if (strcmp(cmd, "estratto_conto")   == 0) cmd_estratto_conto(input);
     else if (strcmp(cmd, "preleva")          == 0) cmd_preleva(input);
     else if (strcmp(cmd, "invia")            == 0) cmd_invia(input);
+    else if (strcmp(cmd, "notifiche")        == 0) cmd_notifiche(input);
     else if (strcmp(cmd, "cerca_utenti")     == 0) cmd_cerca_utenti(input);
     else if (strcmp(cmd, "elimina_account")  == 0) cmd_elimina_account(input);
     else {
@@ -559,6 +627,7 @@ cleanup:
     conti_libera(&banca);
     utenti_libera(&banca);
     coda_libera(&banca.notifiche);
+    free(banca.notifiche_arr);
 
     return 0;
 }

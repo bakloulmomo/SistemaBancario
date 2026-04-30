@@ -5,6 +5,8 @@
 #include "../include/conti.h"
 #include "../include/utils.h"
 
+// Transizioni gestiti tramite Lista linkata
+// crea Nodo transizione 
 Transazione *transazione_aggiungi(StatoBanca *banca, Conto *conto,
                                    TipoTransazione tipo, double importo,
                                    const char *descrizione,
@@ -12,6 +14,7 @@ Transazione *transazione_aggiungi(StatoBanca *banca, Conto *conto,
     Transazione *t = (Transazione *)malloc(sizeof(Transazione));
     if (!t) return NULL;
 
+    // stesso ragionamento per l'array, per azzerare i campi del nodo, in caso di errori
     memset(t, 0, sizeof(Transazione));
     t->id      = banca->prossimo_id_transazione++;
     t->tipo    = tipo;
@@ -21,25 +24,29 @@ Transazione *transazione_aggiungi(StatoBanca *banca, Conto *conto,
     strncpy(t->iban_controparte, iban_controparte ? iban_controparte : "", 34);
     data_ora_corrente(t->data);
 
-    /* Inserisce in testa alla lista */
+    // inserisce in lista
     t->next = conto->transazioni;
     conto->transazioni = t;
 
     return t;
 }
 
+// deposita soldi all'account inizialmente 
 int deposita(StatoBanca *banca, const char *iban,
              double importo, const char *descrizione) {
     if (importo <= 0.0) return 0;
+
 
     Conto *c = conto_cerca_iban(banca, iban);
     if (!c) return 0;
 
     c->saldo += importo;
+    // la aggiunge nello storico delle transazioni
     transazione_aggiungi(banca, c, TX_DEPOSITO, importo, descrizione, "");
     return 1;
 }
 
+// preleva soldi dall'account
 int preleva(StatoBanca *banca, const char *iban,
             double importo, const char *descrizione) {
     if (importo <= 0.0) return 0;
@@ -47,18 +54,25 @@ int preleva(StatoBanca *banca, const char *iban,
     Conto *c = conto_cerca_iban(banca, iban);
     if (!c) return 0;
 
+    // soldi insufficenti
     if (c->saldo < importo) return 0;
 
     c->saldo -= importo;
+    // salva transazione
     transazione_aggiungi(banca, c, TX_PRELIEVO, importo, descrizione, "");
     return 1;
 }
 
+// per cmd, -1 = importo <= 0; -2 = soldi insufficenti; -3 IBAN RX non trovato
+// servono per dire all'utente (tramite JSON) il tipo di errore nel codice
+
+// processo bonifico
 int bonifico(StatoBanca *banca,
              const char *iban_mittente,  const char *iban_destinatario,
              double importo, const char *descrizione) {
     if (importo <= 0.0) return -1;
 
+    // trovo IBAN mittente
     Conto *mittente = conto_cerca_iban(banca, iban_mittente);
     if (!mittente) return -1;
 
@@ -78,6 +92,7 @@ int bonifico(StatoBanca *banca,
     return 1;
 }
 
+// nel cleanup, libera memoria lista
 void transazioni_libera(Transazione *testa) {
     while (testa) {
         Transazione *next = testa->next;
@@ -86,6 +101,7 @@ void transazioni_libera(Transazione *testa) {
     }
 }
 
+// manda la transizione json all'altra funzione
 void transazione_to_json(const Transazione *t, char *out, int outsize) {
     snprintf(out, outsize,
         "{"
@@ -104,25 +120,30 @@ void transazione_to_json(const Transazione *t, char *out, int outsize) {
         t->iban_controparte);
 }
 
+// questa funzione, per mandare tutto al server in un colpo
 void transazioni_to_json(const Transazione *testa, char *out, int outsize) {
-    int written = 0;
-    int first   = 1;
+    int written = 0; // quanti byte sono gia scritti nel buffer out
+    int first   = 1; // flag per la virgola (per JSON)
 
     written += snprintf(out + written, outsize - written, "[");
+    //inizializza JSON con [
 
-    for (const Transazione *t = testa;
-         t && written < outsize - 2; t = t->next) {
-        if (!first) written += snprintf(out + written, outsize - written, ",");
+    for (const Transazione *t = testa; t && written < outsize - 2; t = t->next) {
+        if (!first) written += snprintf(out + written, outsize - written, ","); // se first = 0 aggiunge una virgola
         first = 0;
 
         char tmp[512];
-        transazione_to_json(t, tmp, sizeof(tmp));
-        written += snprintf(out + written, outsize - written, "%s", tmp);
+        transazione_to_json(t, tmp, sizeof(tmp)); // aggiunge transizione in tmp
+        written += snprintf(out + written, outsize - written, "%s", tmp); // scrive infine tutta la transizione in out
     }
 
     snprintf(out + written, outsize - written, "]");
+    //finisce JSON con ]
 }
 
+
+// converte numero enum in stringa leggibile per il client
+// tutto il JSON (o quasi) serve all'utente per mostrargli l'errore
 const char *tipo_transazione_str(TipoTransazione tipo) {
     switch (tipo) {
         case TX_DEPOSITO:     return "deposito";

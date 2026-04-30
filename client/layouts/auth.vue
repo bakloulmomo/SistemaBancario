@@ -2,12 +2,12 @@
   <div class="auth-shell">
     <div class="auth-brand">
       <span class="brand-dot" />
-      <span class="brand-name">CBank</span>
+      <span class="brand-name">PayByte</span>
     </div>
     <div class="auth-content fade-up">
       <slot />
     </div>
-    <p class="auth-footer">© 2025 CBank — Sistema Bancario</p>
+    <p class="auth-footer">©  PayByte — Sistema Bancario</p>
   </div>
 </template>
 
