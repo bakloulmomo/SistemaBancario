@@ -222,6 +222,7 @@ int json_get_num(const char *json, const char *chiave, double *val_out) {
 
 /* ---- Utilità stringhe ---- */
 
+
 void str_trim(char *s) {
     int len = strlen(s);
     while (len > 0 && isspace((unsigned char)s[len - 1]))
