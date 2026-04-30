@@ -16,17 +16,20 @@ void bytes_to_hex(const uint8_t *bytes, int len, char *hex_out) {
     for (int i = 0; i < len; i++)
         sprintf(hex_out + i * 2, "%02x", bytes[i]); // ogni byte = 2 char
     // 02x, x = esadecimale minuscolo, 02 = minimo 2 cifre (es. 9 salva "09" non "9")
-    hex_out[len * 2] = '\0';
+    hex_out[len * 2] = '\0'; // qua l '/0' lo si mette manualmente perche il for lo sovrascive dopo
+    //sprintf scrive la stringa formattata nel buffer
 }
 
+// da stringa a bytes
 void hex_to_bytes(const char *hex, uint8_t *bytes_out, int len) {
     for (int i = 0; i < len; i++) {
         unsigned int val;
-        sscanf(hex + i * 2, "%02x", &val);
-        bytes_out[i] = (uint8_t)val;
+        sscanf(hex + i * 2, "%02x", &val); //sscanf legge stringa (cioe esadecimali)
+        bytes_out[i] = (uint8_t)val; // li mettiamo nel buffer per essere pronti per la cifratura
     }
 }
 
+// cripta la password 
 void password_encrypt(const char *password, char *hex_out) {
     const uint8_t *key = (const uint8_t *)AES_KEY;
     const uint8_t *iv  = (const uint8_t *)AES_IV;
@@ -44,6 +47,7 @@ void password_encrypt(const char *password, char *hex_out) {
     bytes_to_hex(cipher, out_len + final_len, hex_out);
 }
 
+// cifra la password per verificare se la password è giusta
 void password_decrypt(const char *hex_in, char *password_out) {
     const uint8_t *key = (const uint8_t *)AES_KEY;
     const uint8_t *iv  = (const uint8_t *)AES_IV;
@@ -64,6 +68,7 @@ void password_decrypt(const char *hex_in, char *password_out) {
     password_out[out_len + final_len] = '\0';
 }
 
+// verifica la password per l'autenticazione dell'utente
 int password_verifica(const char *password, const char *hex_salvato) {
     char decifrata[48] = {0};
     password_decrypt(hex_salvato, decifrata);

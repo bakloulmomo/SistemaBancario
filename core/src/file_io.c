@@ -8,13 +8,12 @@
 #include "../include/transazioni.h"
 #include "../include/utils.h"
 
-/* ---- Utenti ---- */
+// utenti 
 
 int salva_utenti(const StatoBanca *banca) {
     FILE *f = fopen(PATH_UTENTI, "w");
     if (!f) return 0;
 
-    /* Intestazione */
     fprintf(f, "id,username,password_hex,nome,cognome,email,telefono,"
                "data_nascita,data_registrazione,attivo\n");
 
@@ -38,10 +37,10 @@ int salva_utenti(const StatoBanca *banca) {
 
 int carica_utenti(StatoBanca *banca) {
     FILE *f = fopen(PATH_UTENTI, "r");
-    if (!f) return 1; /* File non esistente = ok, banca vuota */
+    if (!f) return 1; 
 
     char riga[1024];
-    fgets(riga, sizeof(riga), f); /* Salta intestazione */
+    fgets(riga, sizeof(riga), f); 
 
     while (fgets(riga, sizeof(riga), f)) {
         str_trim(riga);
@@ -59,7 +58,7 @@ int carica_utenti(StatoBanca *banca) {
         char nome_esc[128], cognome_esc[128], email_esc[256];
         int attivo;
 
-        /* Parsing manuale con strtok */
+        // parsing manuale con strtok 
         char *tok;
         char  buf[1024];
         strncpy(buf, riga, sizeof(buf) - 1);
@@ -90,7 +89,7 @@ int carica_utenti(StatoBanca *banca) {
     return 1;
 }
 
-/* ---- Conti ---- */
+// Conti/
 
 int salva_conti(const StatoBanca *banca) {
     FILE *f = fopen(PATH_CONTI, "w");
@@ -152,7 +151,7 @@ int carica_conti(StatoBanca *banca) {
     return 1;
 }
 
-/* ---- Transazioni ---- */
+// transazioni
 
 int salva_transazioni(const StatoBanca *banca) {
     FILE *f = fopen(PATH_TRANSAZIONI, "w");
@@ -204,7 +203,7 @@ int carica_transazioni(StatoBanca *banca) {
         tok = strtok(NULL, ","); iban_cp[0] = '\0';
         if (tok) strncpy(iban_cp, tok, 34);
 
-        /* Trova il conto corrispondente */
+
         Conto *c = NULL;
         for (int i = 0; i < banca->n_conti; i++) {
             if (banca->conti[i].id == id_conto) {
@@ -225,7 +224,6 @@ int carica_transazioni(StatoBanca *banca) {
         strncpy(t->data, data, 19);
         strncpy(t->iban_controparte, iban_cp, 34);
 
-        /* Inserisce in testa (l'ordine si inverte, ma va bene) */
         t->next = c->transazioni;
         c->transazioni = t;
 
@@ -237,7 +235,7 @@ int carica_transazioni(StatoBanca *banca) {
     return 1;
 }
 
-/* ---- Sessioni ---- */
+// sessioni
 
 int salva_sessioni(const StatoBanca *banca) {
     FILE *f = fopen(PATH_SESSIONI, "w");
@@ -261,7 +259,7 @@ int carica_sessioni(StatoBanca *banca) {
     if (!f) return 1;
 
     char riga[256];
-    fgets(riga, sizeof(riga), f); /* Salta intestazione */
+    fgets(riga, sizeof(riga), f); 
 
     long adesso = (long)time(NULL);
 
@@ -281,7 +279,7 @@ int carica_sessioni(StatoBanca *banca) {
         tok = strtok(NULL, ","); if (!tok) continue; s->id_utente = atoi(tok);
         tok = strtok(NULL, ","); if (!tok) continue; s->scadenza = atol(tok);
 
-        if (s->scadenza > adesso) /* Carica solo sessioni non scadute */
+        if (s->scadenza > adesso) 
             banca->n_sessioni++;
     }
 
@@ -289,7 +287,7 @@ int carica_sessioni(StatoBanca *banca) {
     return 1;
 }
 
-/* ---- Notifiche ---- */
+// notifiche 
 
 int salva_notifiche(const StatoBanca *banca) {
     FILE *f = fopen(PATH_NOTIFICHE, "w");
@@ -345,7 +343,7 @@ int carica_notifiche(StatoBanca *banca) {
     return 1;
 }
 
-/* ---- Funzioni aggregate ---- */
+// funzioni
 
 int carica_dati(StatoBanca *banca) {
     if (!carica_utenti(banca))      return 0;
