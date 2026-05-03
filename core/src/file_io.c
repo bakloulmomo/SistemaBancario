@@ -8,24 +8,30 @@
 #include "../include/transazioni.h"
 #include "../include/utils.h"
 
-// utenti 
+// Salva dati nel file in /data
 
+// utenti 
 int salva_utenti(const StatoBanca *banca) {
     FILE *f = fopen(PATH_UTENTI, "w");
     if (!f) return 0;
 
-    fprintf(f, "id,username,password_hex,nome,cognome,email,telefono,"
-               "data_nascita,data_registrazione,attivo\n");
+    // header
+    fprintf(f, "id,username,password_hex,nome,cognome,email,telefono,data_nascita,data_registrazione,attivo\n");
 
+    // per ogni utente in banca, 
     for (int i = 0; i < banca->n_utenti; i++) {
         const Utente *u = &banca->utenti[i];
-        char nome_esc[128], cognome_esc[128], email_esc[256];
-        csv_escape(u->nome,    nome_esc,    sizeof(nome_esc));
-        csv_escape(u->cognome, cognome_esc, sizeof(cognome_esc));
-        csv_escape(u->email,   email_esc,   sizeof(email_esc));
+        // solo per le stringhe scelte dall'utente, controlliamo ed aggiustamo le virgole
+        char username_esc[64], nome_esc[128], cognome_esc[128], email_esc[256];
+        csv_escape(u->username, username_esc, sizeof(username_esc));
+        csv_escape(u->nome,     nome_esc,     sizeof(nome_esc));
+        csv_escape(u->cognome,  cognome_esc,  sizeof(cognome_esc));
+        csv_escape(u->email,    email_esc,    sizeof(email_esc));
+        // usiamo infine stringa->esc
 
+        // scriviamo infine tutto sul file CSV utenti
         fprintf(f, "%d,%s,%s,%s,%s,%s,%s,%s,%s,%d\n",
-                u->id, u->username, u->password_hex,
+                u->id, username_esc, u->password_hex,
                 nome_esc, cognome_esc, email_esc,
                 u->telefono, u->data_nascita,
                 u->data_registrazione, u->attivo);
@@ -35,6 +41,7 @@ int salva_utenti(const StatoBanca *banca) {
     return 1;
 }
 
+// per
 int carica_utenti(StatoBanca *banca) {
     FILE *f = fopen(PATH_UTENTI, "r");
     if (!f) return 1; 

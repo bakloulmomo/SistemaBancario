@@ -218,6 +218,8 @@ void str_trim(char *s) {
         memmove(s, start, strlen(start) + 1);
 }
 
+// salva in sicuro stringa in CSV (ad esempio, quando un utente->nome = Marco, Rossi, 
+// toglie la virgola con \, )
 void csv_escape(const char *in, char *out, int outsize) {
     int j = 0;
     for (int i = 0; in[i] && j < outsize - 2; i++) {
@@ -232,6 +234,7 @@ void csv_escape(const char *in, char *out, int outsize) {
         }
     }
     out[j] = '\0';
+    // out alla fine e la stringa che viene usata
 }
 
 void csv_unescape(const char *in, char *out, int outsize) {

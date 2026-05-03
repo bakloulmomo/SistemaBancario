@@ -20,7 +20,7 @@
     login           — username, password
     logout          — token
     profilo         — token
-    aggiorna_profilo — token, nome, cognome
+    aggiorna_profilo  — token, nome, cognome
     cambia_password — token, vecchia_password, nuova_password
     lista_conti     — token
     estratto_conto  — token, iban
