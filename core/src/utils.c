@@ -237,6 +237,7 @@ void csv_escape(const char *in, char *out, int outsize) {
     // out alla fine e la stringa che viene usata
 }
 
+// operazione inversa, per riportare le virgole
 void csv_unescape(const char *in, char *out, int outsize) {
     int j = 0;
     for (int i = 0; in[i] && j < outsize - 1; i++) {

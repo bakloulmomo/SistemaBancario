@@ -10,6 +10,14 @@
 
 // Salva dati nel file in /data
 
+// UTENTI: salva, carica
+// CONTI: salva, carica
+// TRANSAZIONI: salva, carica
+// SESSIONI: salva, carica
+// NOTIFICHE: carica, salva
+// TUTTI I DATI: salva, carica
+
+// CARICA = mette in RAM, tutto all'avvio
 // utenti 
 int salva_utenti(const StatoBanca *banca) {
     FILE *f = fopen(PATH_UTENTI, "w");
@@ -41,35 +49,43 @@ int salva_utenti(const StatoBanca *banca) {
     return 1;
 }
 
-// per
+// per mandare dati dell'utente al sito, tramite altre funzioni
 int carica_utenti(StatoBanca *banca) {
     FILE *f = fopen(PATH_UTENTI, "r");
-    if (!f) return 1; 
+    if (!f) return 0; 
+    // un utente alla volta, quando appena viene creato, viene slavato,
+    // e poi caricato
 
     char riga[1024];
-    fgets(riga, sizeof(riga), f); 
+    fgets(riga, sizeof(riga), f); // legge prima riga (header)
 
+    // si legge una riga alla volta
     while (fgets(riga, sizeof(riga), f)) {
-        str_trim(riga);
-        if (!riga[0]) continue;
+        str_trim(riga); // toglie i \n a fine riga
+        if (!riga[0]) continue; // dopo il trim, se la riga e vuota, si evita e continuamo con il loop
 
+        // sempre se dobbiamo, riallochiamo
         if (banca->n_utenti >= banca->cap_utenti) {
             banca->cap_utenti *= 2;
             banca->utenti = (Utente *)realloc(banca->utenti,
                                 banca->cap_utenti * sizeof(Utente));
-        }
+        } 
 
+        // carica l'ultimo utente
         Utente *u = &banca->utenti[banca->n_utenti];
+        // pulisce lo spazio in memoria suo
         memset(u, 0, sizeof(Utente));
 
-        char nome_esc[128], cognome_esc[128], email_esc[256];
+        char nome_esc[128], cognome_esc[128], email_esc[256], username_esc[256];
         int attivo;
 
         // parsing manuale con strtok 
         char *tok;
         char  buf[1024];
+        // tolgo la prima riga, dell'header
         strncpy(buf, riga, sizeof(buf) - 1);
 
+        // strtok = divido tutta la stringa CSV dell'utente con un ',' a parti
         tok = strtok(buf, ","); if (!tok) continue; u->id = atoi(tok);
         tok = strtok(NULL, ","); if (!tok) continue; strncpy(u->username, tok, 63);
         tok = strtok(NULL, ","); if (!tok) continue; strncpy(u->password_hex, tok, 95);
@@ -81,13 +97,17 @@ int carica_utenti(StatoBanca *banca) {
         tok = strtok(NULL, ","); if (!tok) continue; strncpy(u->data_registrazione, tok, 19);
         tok = strtok(NULL, ","); if (!tok) continue; attivo = atoi(tok);
 
+        // riporto le nuovo modifiche per le stringhe scelte dall'utente
         csv_unescape(nome_esc,    u->nome,    sizeof(u->nome));
         csv_unescape(cognome_esc, u->cognome, sizeof(u->cognome));
         csv_unescape(email_esc,   u->email,   sizeof(u->email));
+        csv_unescape(username_esc, u->username, sizeof(u->username));
+        // lo ritorniamo attivo
         u->attivo = attivo;
 
+        // incremento l'id per il prossimo utente, +1 da questo utente 
         if (u->id >= banca->prossimo_id_utente)
-            banca->prossimo_id_utente = u->id + 1;
+            banca->prossimo_id_utente = u->id +1;
 
         banca->n_utenti++;
     }
@@ -96,34 +116,38 @@ int carica_utenti(StatoBanca *banca) {
     return 1;
 }
 
-// Conti/
-
+// Conti
 int salva_conti(const StatoBanca *banca) {
     FILE *f = fopen(PATH_CONTI, "w");
     if (!f) return 0;
 
+    // header
     fprintf(f, "id,iban,id_utente,saldo,tipo,data_apertura,attivo\n");
 
+    // per ogni utente, salviamo il suo conto
     for (int i = 0; i < banca->n_conti; i++) {
         const Conto *c = &banca->conti[i];
         fprintf(f, "%d,%s,%d,%.2f,%d,%s,%d\n",
                 c->id, c->iban, c->id_utente, c->saldo,
                 c->tipo, c->data_apertura, c->attivo);
     }
-
+ 
     fclose(f);
     return 1;
 }
 
+// carica conto, un utente alla volta
 int carica_conti(StatoBanca *banca) {
     FILE *f = fopen(PATH_CONTI, "r");
     if (!f) return 1;
-
+    // header
     char riga[512];
     fgets(riga, sizeof(riga), f);
 
+    // per ogni riga del csv, la mandiamo in RAM
     while (fgets(riga, sizeof(riga), f)) {
         str_trim(riga);
+        // se la riga e vuota, facciamo senza la riga
         if (!riga[0]) continue;
 
         if (banca->n_conti >= banca->cap_conti) {
@@ -140,7 +164,8 @@ int carica_conti(StatoBanca *banca) {
         strncpy(buf, riga, sizeof(buf) - 1);
 
         char *tok;
-        tok = strtok(buf, ","); if (!tok) continue; c->id = atoi(tok);
+        // per il file csv, lo dividiamo uno ad uno, poi copiamo i parametri in c
+        tok = strtok(buf, ","); if (!tok) continue; c->id = atoi(tok); // atoi per id
         tok = strtok(NULL, ","); if (!tok) continue; strncpy(c->iban, tok, 34);
         tok = strtok(NULL, ","); if (!tok) continue; c->id_utente = atoi(tok);
         tok = strtok(NULL, ","); if (!tok) continue; c->saldo = atof(tok);
@@ -159,7 +184,6 @@ int carica_conti(StatoBanca *banca) {
 }
 
 // transazioni
-
 int salva_transazioni(const StatoBanca *banca) {
     FILE *f = fopen(PATH_TRANSAZIONI, "w");
     if (!f) return 0;
@@ -350,8 +374,7 @@ int carica_notifiche(StatoBanca *banca) {
     return 1;
 }
 
-// funzioni
-
+// carica tutti i dati 
 int carica_dati(StatoBanca *banca) {
     if (!carica_utenti(banca))      return 0;
     if (!carica_conti(banca))       return 0;
@@ -361,6 +384,7 @@ int carica_dati(StatoBanca *banca) {
     return 1;
 }
 
+// salva 
 int salva_dati(const StatoBanca *banca) {
     if (!salva_utenti(banca))      return 0;
     if (!salva_conti(banca))       return 0;
