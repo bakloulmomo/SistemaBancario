@@ -1,134 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include <ctype.h>
 #include "../include/utils.h"
 #include "../include/tipi.h"
 
 
 void genera_iban(int id_conto, char *iban_out) {
-    /* Formato: IT60 + ABI(5) + CAB(5) + CC(12 cifre zero-padded) */
+    // Formato: IT60 + ABI(5) + CAB(5) + CC(12 cifre zero-padded)
     snprintf(iban_out, 35, "IT60%s%s%012d", BANCA_ABI, BANCA_CAB, id_conto);
 }
-
-void genera_token(char *token_out) {
-    for (int i = 0; i < 64; i++) {
-        int r = rand() % 16;
-        token_out[i] = "0123456789abcdef"[r];
-    }
-    token_out[64] = '\0';
-}
-
-void data_ora_corrente(char *out) {
-    time_t t = time(NULL);
-    struct tm *tm_info = localtime(&t);
-    strftime(out, 20, "%Y-%m-%d %H:%M:%S", tm_info);
-}
-
-void data_corrente(char *out) {
-    time_t t = time(NULL);
-    struct tm *tm_info = localtime(&t);
-    strftime(out, 12, "%Y-%m-%d", tm_info);
-}
-
-
-int sessione_crea(StatoBanca *banca, int id_utente, char *token_out) {
-    /* Rimuovi sessioni scadute prima di aggiungere */
-    sessioni_pulisci(banca);
-
-    if (banca->n_sessioni >= MAX_SESSIONI)
-        return 0;
-
-    genera_token(token_out);
-
-    Sessione *s = &banca->sessioni[banca->n_sessioni++];
-    strncpy(s->token, token_out, 64);
-    s->token[64] = '\0';
-    s->id_utente = id_utente;
-    s->scadenza  = (long)time(NULL) + SESSION_DURATA_SEC;
-
-    return 1;
-}
-
-int sessione_verifica(StatoBanca *banca, const char *token) {
-    long adesso = (long)time(NULL);
-    for (int i = 0; i < banca->n_sessioni; i++) {
-        Sessione *s = &banca->sessioni[i];
-        if (strcmp(s->token, token) == 0) {
-            if (s->scadenza < adesso) {
-                /* Sessione scaduta: rimuovi e ritorna errore */
-                sessione_rimuovi(banca, token);
-                return -1;
-            }
-            /* Rinnova scadenza ad ogni uso */
-            s->scadenza = adesso + SESSION_DURATA_SEC;
-            return s->id_utente;
-        }
-    }
-    return -1;
-}
-
-void sessione_rimuovi(StatoBanca *banca, const char *token) {
-    for (int i = 0; i < banca->n_sessioni; i++) {
-        if (strcmp(banca->sessioni[i].token, token) == 0) {
-            /* Sposta l'ultimo al posto di questo (swap & shrink) */
-            banca->sessioni[i] = banca->sessioni[--banca->n_sessioni];
-            return;
-        }
-    }
-}
-
-void sessioni_pulisci(StatoBanca *banca) {
-    long adesso = (long)time(NULL);
-    for (int i = banca->n_sessioni - 1; i >= 0; i--) {
-        if (banca->sessioni[i].scadenza < adesso) {
-            banca->sessioni[i] = banca->sessioni[--banca->n_sessioni];
-        }
-    }
-}
-
-// DSA per notifiche
-
-void coda_enqueue(CodaNotifiche *coda, int id_utente, const char *msg) {
-    NodoCoda *nodo = (NodoCoda *)malloc(sizeof(NodoCoda));
-    if (!nodo) return;
-
-    strncpy(nodo->messaggio, msg, 255);
-    nodo->messaggio[255] = '\0';
-    nodo->id_utente = id_utente;
-    nodo->next = NULL;
-
-    if (coda->coda)
-        coda->coda->next = nodo;
-    else
-        coda->testa = nodo;
-
-    coda->coda = nodo;
-    coda->n++;
-}
-
-NodoCoda *coda_dequeue(CodaNotifiche *coda) {
-    if (!coda->testa) return NULL;
-
-    NodoCoda *nodo = coda->testa;
-    coda->testa = nodo->next;
-    if (!coda->testa) coda->coda = NULL;
-    coda->n--;
-    return nodo;
-}
-
-void coda_libera(CodaNotifiche *coda) {
-    NodoCoda *curr = coda->testa;
-    while (curr) {
-        NodoCoda *next = curr->next;
-        free(curr);
-        curr = next;
-    }
-    coda->testa = coda->coda = NULL;
-    coda->n = 0;
-}
-
 
 void json_ok(const char *data_json, char *out, int outsize) {
     if (data_json && data_json[0] != '\0')
@@ -141,7 +22,6 @@ void json_errore(const char *messaggio, char *out, int outsize) {
     snprintf(out, outsize, "{\"status\":\"error\",\"message\":\"%s\"}", messaggio);
 }
 
-
 int json_get_str(const char *json, const char *chiave,
                  char *val_out, int val_size) {
     char pattern[128];
@@ -150,24 +30,20 @@ int json_get_str(const char *json, const char *chiave,
     const char *pos = strstr(json, pattern);
     if (!pos) return 0;
 
-    /* Avanza oltre il nome chiave */
     pos += strlen(pattern);
 
-    /* Cerca ':' */
     while (*pos && *pos != ':') pos++;
     if (!*pos) return 0;
-    pos++; /* salta ':' */
+    pos++;
 
-    /* Salta spazi */
     while (*pos && isspace((unsigned char)*pos)) pos++;
 
-    /* Verifica che il valore sia una stringa */
     if (*pos != '"') return 0;
-    pos++; /* salta '"' di apertura */
+    pos++;
 
     int i = 0;
     while (*pos && *pos != '"' && i < val_size - 1) {
-        /* Gestione escape JSON base */
+        // Gestione escape JSON base
         if (*pos == '\\' && *(pos + 1)) {
             pos++;
             switch (*pos) {
@@ -201,11 +77,10 @@ int json_get_num(const char *json, const char *chiave, double *val_out) {
 
     while (*pos && isspace((unsigned char)*pos)) pos++;
 
-    if (*pos == '"') return 0; /* è una stringa, non numero */
+    if (*pos == '"') return 0;
 
     return sscanf(pos, "%lf", val_out) == 1 ? 1 : 0;
 }
-
 
 void str_trim(char *s) {
     int len = strlen(s);
@@ -218,7 +93,7 @@ void str_trim(char *s) {
         memmove(s, start, strlen(start) + 1);
 }
 
-// salva in sicuro stringa in CSV (ad esempio, quando un utente->nome = Marco, Rossi, 
+// salva in sicuro stringa in CSV (ad esempio, quando un utente->nome = Marco, Rossi,
 // toglie la virgola con \, )
 void csv_escape(const char *in, char *out, int outsize) {
     int j = 0;
@@ -234,7 +109,6 @@ void csv_escape(const char *in, char *out, int outsize) {
         }
     }
     out[j] = '\0';
-    // out alla fine e la stringa che viene usata
 }
 
 // operazione inversa, per riportare le virgole
@@ -254,7 +128,6 @@ void csv_unescape(const char *in, char *out, int outsize) {
     out[j] = '\0';
 }
 
-
 int str_contains_ci(const char *haystack, const char *needle) {
     if (!needle || !needle[0]) return 1;
     int nlen = (int)strlen(needle);
@@ -267,67 +140,4 @@ int str_contains_ci(const char *haystack, const char *needle) {
         if (j == nlen) return 1;
     }
     return 0;
-}
-
-// genera username da nome+cognome, (se l'utente non lo sceglie)
-void genera_username(const char *nome, const char *cognome, int suffisso, char *out, int outsize) {
-    char p1[5] = {0}, p2[5] = {0};
-    int i;
-    for (i = 0; i < 4 && nome[i]; i++)
-        p1[i] = (char)tolower((unsigned char)nome[i]);
-    for (i = 0; i < 4 && cognome[i]; i++)
-        p2[i] = (char)tolower((unsigned char)cognome[i]);
-    snprintf(out, outsize, "%s_%s_%03d", p1, p2, suffisso % 1000);
-}
-
-// rimuove tutte le sessioni di un utente
-void sessioni_rimuovi_utente(StatoBanca *banca, int id_utente) {
-    for (int i = banca->n_sessioni - 1; i >= 0; i--) {
-        if (banca->sessioni[i].id_utente == id_utente)
-            banca->sessioni[i] = banca->sessioni[--banca->n_sessioni];
-    }
-}
-
-
-void statistiche_json(StatoBanca *banca, int id_utente,
-                      char *out, int outsize) {
-    double totale_depositi  = 0.0;
-    double totale_prelievi  = 0.0;
-    double totale_bonif_out = 0.0;
-    double totale_bonif_in  = 0.0;
-    double saldo_totale     = 0.0;
-    int    n_conti_attivi   = 0;
-    int    n_transazioni    = 0;
-
-    for (int i = 0; i < banca->n_conti; i++) {
-        Conto *c = &banca->conti[i];
-        if (c->id_utente != id_utente || !c->attivo) continue;
-
-        n_conti_attivi++;
-        saldo_totale += c->saldo;
-
-        for (Transazione *t = c->transazioni; t; t = t->next) {
-            n_transazioni++;
-            switch (t->tipo) {
-                case TX_DEPOSITO:     totale_depositi  += t->importo; break;
-                case TX_PRELIEVO:     totale_prelievi  += t->importo; break;
-                case TX_BONIFICO_OUT: totale_bonif_out += t->importo; break;
-                case TX_BONIFICO_IN:  totale_bonif_in  += t->importo; break;
-            }
-        }
-    }
-
-    snprintf(out, outsize,
-        "{"
-        "\"n_conti\":%d,"
-        "\"saldo_totale\":%.2f,"
-        "\"n_transazioni\":%d,"
-        "\"totale_depositi\":%.2f,"
-        "\"totale_prelievi\":%.2f,"
-        "\"totale_bonifici_uscita\":%.2f,"
-        "\"totale_bonifici_entrata\":%.2f"
-        "}",
-        n_conti_attivi, saldo_totale, n_transazioni,
-        totale_depositi, totale_prelievi,
-        totale_bonif_out, totale_bonif_in);
 }

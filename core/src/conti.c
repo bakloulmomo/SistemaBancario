@@ -27,9 +27,9 @@ void conti_libera(StatoBanca *banca) {
 }
 
 // crea conto dell'utente
-int conto_apri(StatoBanca *banca, int id_utente, TipoConto tipo) {
+int conto_apri(StatoBanca *banca, int id_utente) {
     // se numero di conti supera o = la memoria allocata per i conti, si rialloca
-    if (banca->n_conti >= banca->cap_conti) { 
+    if (banca->n_conti >= banca->cap_conti) {
         banca->cap_conti *= 2;
         banca->conti = (Conto *)realloc(banca->conti,
                            banca->cap_conti * sizeof(Conto));
@@ -43,29 +43,15 @@ int conto_apri(StatoBanca *banca, int id_utente, TipoConto tipo) {
     c->id         = banca->prossimo_id_conto++;
     c->id_utente  = id_utente;
     c->saldo      = 0.0;
-    c->tipo       = tipo;
     c->attivo     = 1;
     c->transazioni = NULL;
 
-    // genera IBAN per anche l'account (ogni account = 1 conto, quindi 1 IBAN)
+    // genera IBAN per l'account (ogni account = 1 conto, quindi 1 IBAN)
     genera_iban(c->id, c->iban);
-    data_ora_corrente(c->data_apertura);
 
     banca->n_conti++;
     // torniamo id per le altre funzioni
     return c->id;
-}
-
-// elimina conto, per poter eliminare account
-int conto_chiudi(StatoBanca *banca, int id_utente, const char *iban) {
-    Conto *c = conto_cerca_iban(banca, iban);
-    if (!c) return 0;
-    //controllo che il conto sia dell'utente vero, per sicurezza
-    // perche poi si potrebbe mandare IBAN di qualcun'altro ed eliminarlo
-    if (c->id_utente != id_utente) return 0;
-    if (c->saldo > 0.0) return 0;
-    c->attivo = 0;
-    return 1;
 }
 
 // cerca IBAN
@@ -85,13 +71,9 @@ void conto_to_json(const Conto *c, char *out, int outsize) {
         "\"id\":%d,"
         "\"iban\":\"%s\","
         "\"id_utente\":%d,"
-        "\"saldo\":%.2f,"
-        "\"tipo\":\"%s\","
-        "\"data_apertura\":\"%s\""
+        "\"saldo\":%.2f"
         "}",
-        c->id, c->iban, c->id_utente, c->saldo,
-        c->tipo == CONTO_CORRENTE ? "corrente" : "risparmio",
-        c->data_apertura);
+        c->id, c->iban, c->id_utente, c->saldo);
 }
 
 // stessa procedura 1. [ 2. aggiungiamo conto 1 alla volta 3. aggiungiamo virgole (first = 1) 4. ]

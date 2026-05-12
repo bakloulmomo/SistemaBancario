@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 
 #include "../include/tipi.h"
 #include "../include/utenti.h"
@@ -11,67 +10,54 @@
 #include "../include/utils.h"
 #include "../include/crypto.h"
 
-/*
-  protocollo: Node.js invia una riga JSON su stdin, il core risponde
-  con una riga JSON su stdout e poi finisce il tutto
- 
-  comandi usati nel main(), (usati funzioni):
-    registra        — nome, cognome, eta, password, saldo_iniziale
-    login           — username, password
-    logout          — token
-    profilo         — token
-    aggiorna_profilo  — token, nome, cognome
-    cambia_password — token, vecchia_password, nuova_password
-    lista_conti     — token
-    estratto_conto  — token, iban
-    preleva         — token, importo, descrizione
-    invia           — token, iban_destinatario, importo, descrizione
-    notifiche       — token
-    cerca_utenti    — token, query
-    elimina_account — token, password
- */
+// protocollo: Node.js invia una riga JSON su stdin, il core risponde
+// con una riga JSON su stdout e poi finisce il tutto
+//
+// comandi:
+//   registra        — username, nome, cognome, eta, password, saldo_iniziale
+//   login           — username, password
+//   profilo         — username, password
+//   aggiorna_profilo  — username, password, nome, cognome
+//   cambia_password — username, password, nuova_password
+//   lista_conti     — username, password
+//   estratto_conto  — username, password, iban
+//   preleva         — username, password, importo
+//   invia           — username, password, iban_destinatario, importo
+//   cerca_utenti    — username, password, query
+//   elimina_account — username, password
 
 StatoBanca banca;
 
-
-int verifica_sessione(const char *json, char *token_out) {
-    if (!json_get_str(json, "token", token_out, 65)) {
-        char out[256];
-        json_errore("token mancante", out, sizeof(out));
+// verifica credenziali passate nel JSON, ritorna id_utente o -1
+int verifica_credenziali(const char *json) {
+    char username[64], password[64];
+    char out[256];
+    if (!json_get_str(json, "username", username, sizeof(username)) ||
+        !json_get_str(json, "password", password, sizeof(password))) {
+        json_errore("username o password mancanti", out, sizeof(out));
         puts(out);
         return -1;
     }
-    int id = sessione_verifica(&banca, token_out);
+    int id = utente_login(&banca, username, password);
     if (id < 0) {
-        char out[256];
-        json_errore("sessione non valida o scaduta", out, sizeof(out));
+        json_errore("credenziali non valide", out, sizeof(out));
         puts(out);
         return -1;
     }
     return id;
 }
 
-/* Trova il conto primario (primo attivo) di un utente */
-Conto *conto_primario(int id_utente) {
-    for (int i = 0; i < banca.n_conti; i++) {
-        if (banca.conti[i].id_utente == id_utente && banca.conti[i].attivo)
-            return &banca.conti[i];
-    }
-    return NULL;
-}
-
-
-
 void cmd_registra(const char *json) {
-    char nome[64], cognome[64], password[64];
+    char nome[64], cognome[64], password[64], username[64];
     double eta_d = 0.0, saldo_d = 0.0;
     char out[MAX_JSON_OUT];
 
     if (!json_get_str(json, "nome",     nome,     sizeof(nome))     ||
         !json_get_str(json, "cognome",  cognome,  sizeof(cognome))  ||
         !json_get_str(json, "password", password, sizeof(password)) ||
+        !json_get_str(json, "username", username, sizeof(username)) ||
         !json_get_num(json, "eta",      &eta_d)) {
-        json_errore("parametri mancanti (nome, cognome, eta, password)", out, sizeof(out));
+        json_errore("parametri mancanti (nome, cognome, username, eta, password)", out, sizeof(out));
         puts(out);
         return;
     }
@@ -85,42 +71,13 @@ void cmd_registra(const char *json) {
 
     json_get_num(json, "saldo_iniziale", &saldo_d);
 
-
-    char username[64] = {0};
-    json_get_str(json, "username", username, sizeof(username));
-
-    if (username[0] == '\0') {
-        int tentativi = 0;
-        do {
-            int suffisso = rand() % 1000;
-            genera_username(nome, cognome, suffisso, username, sizeof(username));
-            tentativi++;
-        } while (utente_cerca_username(&banca, username) && tentativi < 200);
-        if (tentativi >= 200) {
-            json_errore("impossibile generare username univoco", out, sizeof(out));
-            puts(out);
-            return;
-        }
-    } else if (utente_cerca_username(&banca, username)) {
+    if (utente_cerca_username(&banca, username)) {
         json_errore("username già in uso", out, sizeof(out));
         puts(out);
         return;
     }
 
-
-    int anno = 1900 + (int)time(NULL) / 31557600 + 70 - eta;
-    /* Calcolo corretto anno corrente */
-    time_t t = time(NULL);
-    struct tm *tm_now = localtime(&t);
-    anno = (tm_now->tm_year + 1900) - eta;
-    char data_nascita[32];
-    snprintf(data_nascita, sizeof(data_nascita), "%04d-01-01", anno);
-
-    char email_auto[128];
-    snprintf(email_auto, sizeof(email_auto), "%s@cbank.local", username);
-
-    int id = utente_aggiungi(&banca, username, password, nome, cognome,
-                              email_auto, "0", data_nascita);
+    int id = utente_aggiungi(&banca, username, password, nome, cognome);
     if (id < 0) {
         json_errore("registrazione fallita", out, sizeof(out));
         puts(out);
@@ -128,8 +85,7 @@ void cmd_registra(const char *json) {
     }
     salva_utenti(&banca);
 
-
-    int id_conto = conto_apri(&banca, id, CONTO_CORRENTE);
+    int id_conto = conto_apri(&banca, id);
     if (id_conto < 0) {
         json_errore("apertura conto fallita", out, sizeof(out));
         puts(out);
@@ -142,83 +98,50 @@ void cmd_registra(const char *json) {
     }
 
     if (saldo_d > 0.0 && c)
-        deposita(&banca, c->iban, saldo_d, "Deposito iniziale");
+        deposita(&banca, c->iban, saldo_d);
 
     salva_dati(&banca);
 
-
-    char token[65];
-    utente_login(&banca, username, password, token);
-    salva_sessioni(&banca);
-
     Utente *u = utente_cerca_id(&banca, id);
-    char utente_json[1024];
+    char utente_json[512];
     utente_to_json(u, utente_json, sizeof(utente_json));
 
-    char data_json[2048];
+    char data_json[1024];
     snprintf(data_json, sizeof(data_json),
-        "{\"token\":\"%s\",\"username\":\"%s\",\"iban\":\"%s\",\"saldo\":%.2f,\"utente\":%s}",
-        token, username, c ? c->iban : "", c ? c->saldo : 0.0, utente_json);
+        "{\"username\":\"%s\",\"iban\":\"%s\",\"saldo\":%.2f,\"utente\":%s}",
+        username, c ? c->iban : "", c ? c->saldo : 0.0, utente_json);
 
     json_ok(data_json, out, sizeof(out));
     puts(out);
 }
 
 void cmd_login(const char *json) {
-    char username[64], password[64];
-    char token[65];
     char out[MAX_JSON_OUT];
 
-    if (!json_get_str(json, "username", username, sizeof(username)) ||
-        !json_get_str(json, "password", password, sizeof(password))) {
-        json_errore("parametri mancanti", out, sizeof(out));
-        puts(out);
-        return;
-    }
-
-    int id = utente_login(&banca, username, password, token);
-    if (id < 0) {
-        json_errore("credenziali non valide", out, sizeof(out));
-        puts(out);
-        return;
-    }
+    int id = verifica_credenziali(json);
+    if (id < 0) return;
 
     Utente *u = utente_cerca_id(&banca, id);
-    char utente_json[1024];
+    char utente_json[512];
     utente_to_json(u, utente_json, sizeof(utente_json));
 
-    Conto *c = conto_primario(id);
-    char data_json[2048];
+    Conto *c = NULL;
+    for (int i = 0; i < banca.n_conti; i++)
+        if (banca.conti[i].id_utente == id && banca.conti[i].attivo) { c = &banca.conti[i]; break; }
+
+    char data_json[1024];
     snprintf(data_json, sizeof(data_json),
-        "{\"token\":\"%s\",\"iban\":\"%s\",\"saldo\":%.2f,\"utente\":%s}",
-        token, c ? c->iban : "", c ? c->saldo : 0.0, utente_json);
+        "{\"iban\":\"%s\",\"saldo\":%.2f,\"utente\":%s}",
+        c ? c->iban : "", c ? c->saldo : 0.0, utente_json);
 
     json_ok(data_json, out, sizeof(out));
-    salva_sessioni(&banca);
-    puts(out);
-}
-
-void cmd_logout(const char *json) {
-    char token[65];
-    char out[256];
-
-    if (!json_get_str(json, "token", token, sizeof(token))) {
-        json_errore("token mancante", out, sizeof(out));
-        puts(out);
-        return;
-    }
-
-    utente_logout(&banca, token);
-    salva_sessioni(&banca);
-    json_ok("", out, sizeof(out));
     puts(out);
 }
 
 void cmd_profilo(const char *json) {
-    char token[65];
     char out[MAX_JSON_OUT];
 
-    int id = verifica_sessione(json, token);
+    int id = verifica_credenziali(json);
     if (id < 0) return;
 
     Utente *u = utente_cerca_id(&banca, id);
@@ -228,12 +151,14 @@ void cmd_profilo(const char *json) {
         return;
     }
 
-    Conto *c = conto_primario(id);
-    char utente_json[1024];
+    Conto *c = NULL;
+    for (int i = 0; i < banca.n_conti; i++)
+        if (banca.conti[i].id_utente == id && banca.conti[i].attivo) { c = &banca.conti[i]; break; }
+
+    char utente_json[512];
     utente_to_json(u, utente_json, sizeof(utente_json));
 
-
-    char data_json[2048];
+    char data_json[1024];
     snprintf(data_json, sizeof(data_json),
         "{\"utente\":%s,\"iban\":\"%s\",\"saldo\":%.2f}",
         utente_json, c ? c->iban : "", c ? c->saldo : 0.0);
@@ -243,16 +168,16 @@ void cmd_profilo(const char *json) {
 }
 
 void cmd_aggiorna_profilo(const char *json) {
-    char token[65], nome[64], cognome[64];
-    char out[512];
+    char nome[64], cognome[64];
+    char out[256];
 
-    int id = verifica_sessione(json, token);
+    int id = verifica_credenziali(json);
     if (id < 0) return;
 
     json_get_str(json, "nome",    nome,    sizeof(nome));
     json_get_str(json, "cognome", cognome, sizeof(cognome));
 
-    if (!utente_aggiorna_profilo(&banca, id, nome, cognome, "", "")) {
+    if (!utente_aggiorna_profilo(&banca, id, nome, cognome)) {
         json_errore("aggiornamento profilo fallito", out, sizeof(out));
         puts(out);
         return;
@@ -264,21 +189,20 @@ void cmd_aggiorna_profilo(const char *json) {
 }
 
 void cmd_cambia_password(const char *json) {
-    char token[65], vecchia[64], nuova[64];
+    char nuova[64];
     char out[256];
 
-    int id = verifica_sessione(json, token);
+    int id = verifica_credenziali(json);
     if (id < 0) return;
 
-    if (!json_get_str(json, "vecchia_password", vecchia, sizeof(vecchia)) ||
-        !json_get_str(json, "nuova_password",   nuova,   sizeof(nuova))) {
-        json_errore("parametri mancanti", out, sizeof(out));
+    if (!json_get_str(json, "nuova_password", nuova, sizeof(nuova))) {
+        json_errore("nuova_password mancante", out, sizeof(out));
         puts(out);
         return;
     }
 
-    if (!utente_cambia_password(&banca, id, vecchia, nuova)) {
-        json_errore("password attuale errata", out, sizeof(out));
+    if (!utente_cambia_password(&banca, id, nuova)) {
+        json_errore("cambio password fallito", out, sizeof(out));
         puts(out);
         return;
     }
@@ -289,10 +213,9 @@ void cmd_cambia_password(const char *json) {
 }
 
 void cmd_lista_conti(const char *json) {
-    char token[65];
     char out[MAX_JSON_OUT];
 
-    int id = verifica_sessione(json, token);
+    int id = verifica_credenziali(json);
     if (id < 0) return;
 
     char conti_json[MAX_JSON_OUT - 64];
@@ -302,10 +225,10 @@ void cmd_lista_conti(const char *json) {
 }
 
 void cmd_estratto_conto(const char *json) {
-    char token[65], iban[35];
+    char iban[35];
     char out[MAX_JSON_OUT];
 
-    int id = verifica_sessione(json, token);
+    int id = verifica_credenziali(json);
     if (id < 0) return;
 
     if (!json_get_str(json, "iban", iban, sizeof(iban))) {
@@ -321,10 +244,10 @@ void cmd_estratto_conto(const char *json) {
         return;
     }
 
-    char conto_json[512];
+    char conto_json[256];
     conto_to_json(c, conto_json, sizeof(conto_json));
 
-    char tx_json[MAX_JSON_OUT - 1024];
+    char tx_json[MAX_JSON_OUT - 512];
     transazioni_to_json(c->transazioni, tx_json, sizeof(tx_json));
 
     char data_json[MAX_JSON_OUT - 256];
@@ -336,11 +259,10 @@ void cmd_estratto_conto(const char *json) {
 }
 
 void cmd_preleva(const char *json) {
-    char token[65], descrizione[128];
     double importo = 0.0;
-    char out[512];
+    char out[256];
 
-    int id = verifica_sessione(json, token);
+    int id = verifica_credenziali(json);
     if (id < 0) return;
 
     if (!json_get_num(json, "importo", &importo)) {
@@ -348,16 +270,17 @@ void cmd_preleva(const char *json) {
         puts(out);
         return;
     }
-    json_get_str(json, "descrizione", descrizione, sizeof(descrizione));
 
-    Conto *c = conto_primario(id);
+    Conto *c = NULL;
+    for (int i = 0; i < banca.n_conti; i++)
+        if (banca.conti[i].id_utente == id && banca.conti[i].attivo) { c = &banca.conti[i]; break; }
     if (!c) {
         json_errore("nessun conto trovato", out, sizeof(out));
         puts(out);
         return;
     }
 
-    if (!preleva(&banca, c->iban, importo, descrizione)) {
+    if (!preleva(&banca, c->iban, importo)) {
         json_errore("fondi insufficienti", out, sizeof(out));
         puts(out);
         return;
@@ -372,12 +295,11 @@ void cmd_preleva(const char *json) {
 }
 
 void cmd_invia(const char *json) {
-    char token[65], iban_dest[35], descrizione[128];
-
+    char iban_dest[35];
     double importo = 0.0;
-    char out[512];
+    char out[256];
 
-    int id = verifica_sessione(json, token);
+    int id = verifica_credenziali(json);
     if (id < 0) return;
 
     if (!json_get_str(json, "iban_destinatario", iban_dest, sizeof(iban_dest)) ||
@@ -386,9 +308,10 @@ void cmd_invia(const char *json) {
         puts(out);
         return;
     }
-    json_get_str(json, "descrizione", descrizione, sizeof(descrizione));
 
-    Conto *mittente = conto_primario(id);
+    Conto *mittente = NULL;
+    for (int i = 0; i < banca.n_conti; i++)
+        if (banca.conti[i].id_utente == id && banca.conti[i].attivo) { mittente = &banca.conti[i]; break; }
     if (!mittente) {
         json_errore("nessun conto trovato", out, sizeof(out));
         puts(out);
@@ -401,33 +324,11 @@ void cmd_invia(const char *json) {
         return;
     }
 
-    int esito = bonifico(&banca, mittente->iban, iban_dest, importo, descrizione);
+    int esito = bonifico(&banca, mittente->iban, iban_dest, importo);
 
     if (esito == -2) { json_errore("fondi insufficienti", out, sizeof(out)); puts(out); return; }
     if (esito == -3) { json_errore("IBAN destinatario non trovato", out, sizeof(out)); puts(out); return; }
     if (esito < 0)   { json_errore("invio fallito", out, sizeof(out)); puts(out); return; }
-
-    /* Aggiungi notifica al destinatario */
-    Conto *dest_conto = conto_cerca_iban(&banca, iban_dest);
-    if (dest_conto) {
-        Utente *mittente_utente = utente_cerca_id(&banca, id);
-        if (mittente_utente) {
-            if (banca.n_notifiche >= banca.cap_notifiche) {
-                banca.cap_notifiche = banca.cap_notifiche ? banca.cap_notifiche * 2 : 64;
-                banca.notifiche_arr = (Notifica *)realloc(banca.notifiche_arr,
-                                           banca.cap_notifiche * sizeof(Notifica));
-            }
-            Notifica *n = &banca.notifiche_arr[banca.n_notifiche];
-            memset(n, 0, sizeof(Notifica));
-            n->id_utente = dest_conto->id_utente;
-            snprintf(n->messaggio, sizeof(n->messaggio),
-                     "Ricevuto €%.2f da %s %s",
-                     importo, mittente_utente->nome, mittente_utente->cognome);
-            char ts[20]; data_ora_corrente(ts);
-            strncpy(n->timestamp, ts, 19);
-            banca.n_notifiche++;
-        }
-    }
 
     salva_dati(&banca);
 
@@ -437,54 +338,11 @@ void cmd_invia(const char *json) {
     puts(out);
 }
 
-void cmd_notifiche(const char *json) {
-    char token[65];
-    char out[MAX_JSON_OUT];
-
-    int id = verifica_sessione(json, token);
-    if (id < 0) return;
-
-    char arr[MAX_JSON_OUT - 64];
-    int pos = 0;
-    arr[pos++] = '[';
-    int first = 1;
-    int nuove = 0;
-
-    for (int i = 0; i < banca.n_notifiche; i++) {
-        Notifica *n = &banca.notifiche_arr[i];
-        if (n->id_utente != id) continue;
-        if (!first) arr[pos++] = ',';
-        first = 0;
-        pos += snprintf(arr + pos, sizeof(arr) - pos - 2,
-                        "{\"messaggio\":\"%s\",\"timestamp\":\"%s\"}",
-                        n->messaggio, n->timestamp);
-        nuove++;
-    }
-    arr[pos++] = ']';
-    arr[pos]   = '\0';
-
-    if (nuove > 0) {
-        int w = 0;
-        for (int i = 0; i < banca.n_notifiche; i++) {
-            if (banca.notifiche_arr[i].id_utente != id)
-                banca.notifiche_arr[w++] = banca.notifiche_arr[i];
-        }
-        banca.n_notifiche = w;
-        salva_notifiche(&banca);
-    }
-
-    char body[MAX_JSON_OUT];
-    snprintf(body, sizeof(body), "{\"notifiche\":%s}", arr);
-    json_ok(body, out, sizeof(out));
-    puts(out);
-}
-
-
 void cmd_cerca_utenti(const char *json) {
-    char token[65], query[128];
+    char query[128];
     char out[MAX_JSON_OUT];
 
-    int id_self = verifica_sessione(json, token);
+    int id_self = verifica_credenziali(json);
     if (id_self < 0) return;
 
     query[0] = '\0';
@@ -505,10 +363,12 @@ void cmd_cerca_utenti(const char *json) {
             !str_contains_ci(u->username, query))
             continue;
 
-        Conto *c = conto_primario(u->id);
+        Conto *c = NULL;
+        for (int j = 0; j < banca.n_conti; j++)
+            if (banca.conti[j].id_utente == u->id && banca.conti[j].attivo) { c = &banca.conti[j]; break; }
         if (!c) continue;
 
-        char entry[512];
+        char entry[256];
         int elen = snprintf(entry, sizeof(entry),
             "{\"id\":%d,\"nome\":\"%s\",\"cognome\":\"%s\",\"username\":\"%s\",\"iban\":\"%s\"}",
             u->id, u->nome, u->cognome, u->username, c->iban);
@@ -527,55 +387,28 @@ void cmd_cerca_utenti(const char *json) {
 }
 
 void cmd_elimina_account(const char *json) {
-    char token[65], password[64];
     char out[256];
 
-    int id = verifica_sessione(json, token);
+    int id = verifica_credenziali(json);
     if (id < 0) return;
-
-    if (!json_get_str(json, "password", password, sizeof(password))) {
-        json_errore("password mancante", out, sizeof(out));
-        puts(out);
-        return;
-    }
-
-    Utente *u = utente_cerca_id(&banca, id);
-    if (!u) {
-        json_errore("utente non trovato", out, sizeof(out));
-        puts(out);
-        return;
-    }
-
-    if (!password_verifica(password, u->password_hex)) {
-        json_errore("password errata", out, sizeof(out));
-        puts(out);
-        return;
-    }
-
 
     for (int i = 0; i < banca.n_conti; i++) {
         if (banca.conti[i].id_utente == id)
             banca.conti[i].attivo = 0;
     }
 
+    Utente *u = utente_cerca_id(&banca, id);
     u->attivo = 0;
-
-
-    sessioni_rimuovi_utente(&banca, id);
 
     salva_dati(&banca);
     salva_utenti(&banca);
-    salva_sessioni(&banca);
 
     json_ok("", out, sizeof(out));
     puts(out);
 }
 
-
 // ENTRYPOINT
 int main() {
-    srand((unsigned)time(NULL));
-
     memset(&banca, 0, sizeof(StatoBanca));
     utenti_init(&banca);
     conti_init(&banca);
@@ -604,7 +437,6 @@ int main() {
 
     if      (strcmp(cmd, "registra")         == 0) cmd_registra(input);
     else if (strcmp(cmd, "login")            == 0) cmd_login(input);
-    else if (strcmp(cmd, "logout")           == 0) cmd_logout(input);
     else if (strcmp(cmd, "profilo")          == 0) cmd_profilo(input);
     else if (strcmp(cmd, "aggiorna_profilo") == 0) cmd_aggiorna_profilo(input);
     else if (strcmp(cmd, "cambia_password")  == 0) cmd_cambia_password(input);
@@ -612,7 +444,6 @@ int main() {
     else if (strcmp(cmd, "estratto_conto")   == 0) cmd_estratto_conto(input);
     else if (strcmp(cmd, "preleva")          == 0) cmd_preleva(input);
     else if (strcmp(cmd, "invia")            == 0) cmd_invia(input);
-    else if (strcmp(cmd, "notifiche")        == 0) cmd_notifiche(input);
     else if (strcmp(cmd, "cerca_utenti")     == 0) cmd_cerca_utenti(input);
     else if (strcmp(cmd, "elimina_account")  == 0) cmd_elimina_account(input);
     else {
@@ -624,8 +455,6 @@ int main() {
 cleanup:
     conti_libera(&banca);
     utenti_libera(&banca);
-    coda_libera(&banca.notifiche);
-    free(banca.notifiche_arr);
 
     return 0;
 }

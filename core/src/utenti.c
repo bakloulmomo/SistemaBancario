@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include "../include/utenti.h"
 #include "../include/crypto.h"
 #include "../include/utils.h"
@@ -28,9 +27,7 @@ void utenti_libera(StatoBanca *banca) {
 // aggiunge un utente all'array
 int utente_aggiungi(StatoBanca *banca,
                     const char *username, const char *password,
-                    const char *nome,     const char *cognome,
-                    const char *email,    const char *telefono,
-                    const char *data_nascita) {
+                    const char *nome,     const char *cognome) {
 
     // se username gia esistente, torna -1
     if (utente_cerca_username(banca, username)) return -1;
@@ -55,20 +52,15 @@ int utente_aggiungi(StatoBanca *banca,
     // * qua
     u->id = banca->prossimo_id_utente++;
     // id univoco per l'utente
-    strncpy(u->username,     username,    63);
+    strncpy(u->username, username, 63);
     // copia username in u->username
-    strncpy(u->nome,         nome,        63);
-    strncpy(u->cognome,      cognome,     63);
-    strncpy(u->email,        email,       127);
-    strncpy(u->telefono,     telefono,    19);
-    strncpy(u->data_nascita, data_nascita,11);
+    strncpy(u->nome,     nome,     63);
+    strncpy(u->cognome,  cognome,  63);
     u->attivo = 1;
     //attivo = 1, (per gestire anche l'eliminazione dell'account, in quel caso attivo = 0)
 
     //cripta password
     password_encrypt(password, u->password_hex);
-    // salva data registrazione
-    data_ora_corrente(u->data_registrazione);
 
     // aggiunge 1 elemento per prossimo utente
     banca->n_utenti++;
@@ -85,7 +77,7 @@ Utente *utente_cerca_username(StatoBanca *banca, const char *username) {
     return NULL;
 }
 
-// cerca id, stesso dello username, usato per operazioni su account, 
+// cerca id, stesso dello username, usato per operazioni su account
 Utente *utente_cerca_id(StatoBanca *banca, int id) {
     for (int i = 0; i < banca->n_utenti; i++) {
         if (banca->utenti[i].id == id && banca->utenti[i].attivo)
@@ -94,63 +86,36 @@ Utente *utente_cerca_id(StatoBanca *banca, int id) {
     return NULL;
 }
 
-
 // operazione login utente
-int utente_login(StatoBanca *banca,
-                 const char *username, const char *password,
-                 char *token_out) {
+int utente_login(StatoBanca *banca, const char *username, const char *password) {
     Utente *u = utente_cerca_username(banca, username);
     // se non trova utente
     if (!u) return -1;
 
     // verifica password
-    if (!password_verifica(password, u->password_hex)) return 1;
-
-    // crea sessione
-    if (!sessione_crea(banca, u->id, token_out)) return -1;
+    if (!password_verifica(password, u->password_hex)) return -1;
 
     return u->id;
 }
 
-// logout
-void utente_logout(StatoBanca *banca, const char *token) {
-    sessione_rimuovi(banca, token);
-}
-
-// aggiorna profilo (nome, username, ...)
+// aggiorna profilo (nome, cognome)
 int utente_aggiorna_profilo(StatoBanca *banca, int id_utente,
-                             const char *nome,    const char *cognome,
-                             const char *email,   const char *telefono) {
+                             const char *nome, const char *cognome) {
     Utente *u = utente_cerca_id(banca, id_utente);
     if (!u) return 0;
 
-    if (nome     && nome[0])     strncpy(u->nome,     nome,     63);
-    if (cognome  && cognome[0])  strncpy(u->cognome,  cognome,  63);
-    if (email    && email[0])    strncpy(u->email,    email,    127);
-    if (telefono && telefono[0]) strncpy(u->telefono, telefono, 19);
-
+    if (nome    && nome[0])    strncpy(u->nome,    nome,    63);
+    if (cognome && cognome[0]) strncpy(u->cognome, cognome, 63);
     return 1;
 }
 
-// cambia password, qui diverso 
-int utente_cambia_password(StatoBanca *banca, int id_utente, const char *vecchia_pw, const char *nuova_pw) {
+// cambia password, qui diverso
+int utente_cambia_password(StatoBanca *banca, int id_utente, const char *nuova_pw) {
     Utente *u = utente_cerca_id(banca, id_utente);
     if (!u) return 0;
-
-    //qua serve cifratura vecchia password per controlli
-    if (!password_verifica(vecchia_pw, u->password_hex)) return 0;
 
     // e criptarla
     password_encrypt(nuova_pw, u->password_hex);
-    return 1;
-}
-
-// elimina account
-int utente_disattiva(StatoBanca *banca, int id_utente) {
-    Utente *u = utente_cerca_id(banca, id_utente);
-    if (!u) return 0;
-    // qui come prima
-    u->attivo = 0;
     return 1;
 }
 
@@ -158,7 +123,7 @@ int utente_disattiva(StatoBanca *banca, int id_utente) {
 // out = il buffer
 // outsize = DIM_MAX di out, per evitare overflow
 
-// si passa buf[4096] e la si passa alla funzione, 
+// si passa buf[4096] e la si passa alla funzione,
 // snprintf riempa il buf col JSON, cosi da mandare via socket
 
 void utente_to_json(const Utente *u, char *out, int outsize) {
@@ -167,12 +132,7 @@ void utente_to_json(const Utente *u, char *out, int outsize) {
         "\"id\":%d,"
         "\"username\":\"%s\","
         "\"nome\":\"%s\","
-        "\"cognome\":\"%s\","
-        "\"email\":\"%s\","
-        "\"telefono\":\"%s\","
-        "\"data_nascita\":\"%s\","
-        "\"data_registrazione\":\"%s\""
+        "\"cognome\":\"%s\""
         "}",
-        u->id, u->username, u->nome, u->cognome,
-        u->email, u->telefono, u->data_nascita, u->data_registrazione);
+        u->id, u->username, u->nome, u->cognome);
 }

@@ -6,10 +6,9 @@
 #include "../include/utils.h"
 
 // Transizioni gestiti tramite Lista linkata
-// crea Nodo transizione 
+// crea Nodo transizione
 Transazione *transazione_aggiungi(StatoBanca *banca, Conto *conto,
                                    TipoTransazione tipo, double importo,
-                                   const char *descrizione,
                                    const char *iban_controparte) {
     Transazione *t = (Transazione *)malloc(sizeof(Transazione));
     if (!t) return NULL;
@@ -20,9 +19,7 @@ Transazione *transazione_aggiungi(StatoBanca *banca, Conto *conto,
     t->tipo    = tipo;
     t->importo = importo;
 
-    strncpy(t->descrizione, descrizione ? descrizione : "", 127);
     strncpy(t->iban_controparte, iban_controparte ? iban_controparte : "", 34);
-    data_ora_corrente(t->data);
 
     // inserisce in lista
     t->next = conto->transazioni;
@@ -31,24 +28,21 @@ Transazione *transazione_aggiungi(StatoBanca *banca, Conto *conto,
     return t;
 }
 
-// deposita soldi all'account inizialmente 
-int deposita(StatoBanca *banca, const char *iban,
-             double importo, const char *descrizione) {
+// deposita soldi all'account inizialmente
+int deposita(StatoBanca *banca, const char *iban, double importo) {
     if (importo <= 0.0) return 0;
-
 
     Conto *c = conto_cerca_iban(banca, iban);
     if (!c) return 0;
 
     c->saldo += importo;
     // la aggiunge nello storico delle transazioni
-    transazione_aggiungi(banca, c, TX_DEPOSITO, importo, descrizione, "");
+    transazione_aggiungi(banca, c, TX_DEPOSITO, importo, "");
     return 1;
 }
 
 // preleva soldi dall'account
-int preleva(StatoBanca *banca, const char *iban,
-            double importo, const char *descrizione) {
+int preleva(StatoBanca *banca, const char *iban, double importo) {
     if (importo <= 0.0) return 0;
 
     Conto *c = conto_cerca_iban(banca, iban);
@@ -59,7 +53,7 @@ int preleva(StatoBanca *banca, const char *iban,
 
     c->saldo -= importo;
     // salva transazione
-    transazione_aggiungi(banca, c, TX_PRELIEVO, importo, descrizione, "");
+    transazione_aggiungi(banca, c, TX_PRELIEVO, importo, "");
     return 1;
 }
 
@@ -68,8 +62,8 @@ int preleva(StatoBanca *banca, const char *iban,
 
 // processo bonifico
 int bonifico(StatoBanca *banca,
-             const char *iban_mittente,  const char *iban_destinatario,
-             double importo, const char *descrizione) {
+             const char *iban_mittente, const char *iban_destinatario,
+             double importo) {
     if (importo <= 0.0) return -1;
 
     // trovo IBAN mittente
@@ -82,12 +76,10 @@ int bonifico(StatoBanca *banca,
     if (!destinatario) return -3;
 
     mittente->saldo -= importo;
-    transazione_aggiungi(banca, mittente,    TX_BONIFICO_OUT, importo,
-                         descrizione, iban_destinatario);
+    transazione_aggiungi(banca, mittente, TX_BONIFICO_OUT, importo, iban_destinatario);
 
     destinatario->saldo += importo;
-    transazione_aggiungi(banca, destinatario, TX_BONIFICO_IN,  importo,
-                         descrizione, iban_mittente);
+    transazione_aggiungi(banca, destinatario, TX_BONIFICO_IN, importo, iban_mittente);
 
     return 1;
 }
@@ -108,15 +100,11 @@ void transazione_to_json(const Transazione *t, char *out, int outsize) {
         "\"id\":%d,"
         "\"tipo\":\"%s\","
         "\"importo\":%.2f,"
-        "\"descrizione\":\"%s\","
-        "\"data\":\"%s\","
         "\"iban_controparte\":\"%s\""
         "}",
         t->id,
         tipo_transazione_str(t->tipo),
         t->importo,
-        t->descrizione,
-        t->data,
         t->iban_controparte);
 }
 
@@ -126,13 +114,13 @@ void transazioni_to_json(const Transazione *testa, char *out, int outsize) {
     int first   = 1; // flag per la virgola (per JSON)
 
     written += snprintf(out + written, outsize - written, "[");
-    //inizializza JSON con [
+    //inizializza l' array JSON con [
 
     for (const Transazione *t = testa; t && written < outsize - 2; t = t->next) {
         if (!first) written += snprintf(out + written, outsize - written, ","); // se first = 0 aggiunge una virgola
         first = 0;
 
-        char tmp[512];
+        char tmp[256];
         transazione_to_json(t, tmp, sizeof(tmp)); // aggiunge transizione in tmp
         written += snprintf(out + written, outsize - written, "%s", tmp); // scrive infine tutta la transizione in out
     }
