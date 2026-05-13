@@ -25,7 +25,7 @@ typedef enum {
 typedef struct Transazione {
     int             id;
     TipoTransazione tipo;
-    double          importo;
+    int             importo;
     char            iban_controparte[35];
     struct Transazione *next;
 } Transazione;
@@ -35,7 +35,7 @@ typedef struct {
     int         id;
     char        iban[35];
     int         id_utente;
-    double      saldo;
+    int         saldo;
     int         attivo;
     Transazione *transazioni;           // testa lista collegata
 } Conto;

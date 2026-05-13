@@ -173,21 +173,29 @@ const prelievoImporto     = ref(0)
 const prelievoDescrizione = ref('')
 
 const transazioniOrdinati = computed(() =>
-  [...transazioni.value].sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
+  [...transazioni.value].sort((a, b) => (b as any).id - (a as any).id)
 )
 
 function formatEuro(n: number) {
   return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(n)
 }
-function formatData(d: string) {
-  return new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: '2-digit' })
+function formatData(d: string | undefined) {
+  if (!d) return '—'
+  const date = new Date(d)
+  if (isNaN(date.getTime())) return '—'
+  return date.toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: '2-digit' })
 }
 function tipoLabel(tipo: string | number) {
-  const map: Record<string, string> = { '0': 'Deposito', '1': 'Prelievo', '2': 'Bonifico uscita', '3': 'Bonifico entrata' }
-  return map[String(tipo)] ?? tipo
+  const map: Record<string, string> = {
+    'deposito': 'Deposito',
+    'prelievo': 'Prelievo',
+    'bonifico_uscita': 'Bonifico uscita',
+    'bonifico_entrata': 'Bonifico entrata'
+  }
+  return map[String(tipo)] ?? String(tipo)
 }
 function isEntrata(tx: any) {
-  return tx.tipo === 3 || tx.tipo === '3' || tx.tipo === 0 || tx.tipo === '0'
+  return tx.tipo === 'deposito' || tx.tipo === 'bonifico_entrata'
 }
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null

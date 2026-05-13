@@ -1,6 +1,6 @@
 const { Router } = require('express');
 const { eseguiCore } = require('../core');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, storeToken, removeToken } = require('../middleware/auth');
 
 const router = Router();
 
@@ -15,7 +15,8 @@ router.post('/registra', async (req, res) => {
     if (username) payload.username = username;
     const r = await eseguiCore(payload);
     if (r.status !== 'ok') return res.status(400).json(r);
-    res.json(r);
+    const token = storeToken(r.data.username || username, password);
+    res.json({ ...r, data: { ...r.data, token } });
   } catch (e) {
     res.status(500).json({ status: 'error', message: e.message });
   }
@@ -28,24 +29,21 @@ router.post('/login', async (req, res) => {
   try {
     const r = await eseguiCore({ cmd: 'login', username, password });
     if (r.status !== 'ok') return res.status(401).json(r);
-    res.json(r);
+    const token = storeToken(username, password);
+    res.json({ ...r, data: { ...r.data, token } });
   } catch (e) {
     res.status(500).json({ status: 'error', message: e.message });
   }
 });
 
-router.post('/logout', requireAuth, async (req, res) => {
-  try {
-    const r = await eseguiCore({ cmd: 'logout', token: req.token });
-    res.json(r);
-  } catch (e) {
-    res.status(500).json({ status: 'error', message: e.message });
-  }
+router.post('/logout', requireAuth, (req, res) => {
+  removeToken(req.token);
+  res.json({ status: 'ok' });
 });
 
 router.get('/profilo', requireAuth, async (req, res) => {
   try {
-    const r = await eseguiCore({ cmd: 'profilo', token: req.token });
+    const r = await eseguiCore({ cmd: 'profilo', username: req.username, password: req.password });
     res.json(r);
   } catch (e) {
     res.status(500).json({ status: 'error', message: e.message });

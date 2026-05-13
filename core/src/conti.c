@@ -42,7 +42,7 @@ int conto_apri(StatoBanca *banca, int id_utente) {
 
     c->id         = banca->prossimo_id_conto++;
     c->id_utente  = id_utente;
-    c->saldo      = 0.0;
+    c->saldo      = 0;
     c->attivo     = 1;
     c->transazioni = NULL;
 
@@ -71,7 +71,7 @@ void conto_to_json(const Conto *c, char *out, int outsize) {
         "\"id\":%d,"
         "\"iban\":\"%s\","
         "\"id_utente\":%d,"
-        "\"saldo\":%.2f"
+        "\"saldo\":%d"
         "}",
         c->id, c->iban, c->id_utente, c->saldo);
 }

@@ -128,6 +128,7 @@ void csv_unescape(const char *in, char *out, int outsize) {
     out[j] = '\0';
 }
 
+// per cercare destinatario del bonifico
 int str_contains_ci(const char *haystack, const char *needle) {
     if (!needle || !needle[0]) return 1;
     int nlen = (int)strlen(needle);

@@ -77,7 +77,7 @@ Utente *utente_cerca_username(StatoBanca *banca, const char *username) {
     return NULL;
 }
 
-// cerca id, stesso dello username, usato per operazioni su account
+// cerca l'utente tramite il suo id, usato per operazioni su account
 Utente *utente_cerca_id(StatoBanca *banca, int id) {
     for (int i = 0; i < banca->n_utenti; i++) {
         if (banca->utenti[i].id == id && banca->utenti[i].attivo)

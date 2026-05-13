@@ -44,7 +44,7 @@ int salva_utenti(const StatoBanca *banca) {
     return 1;
 }
 
-// per mandare dati dell'utente al sito, tramite altre funzioni
+// per caricare gli studenti nell'array, all'inizio del programma
 int carica_utenti(StatoBanca *banca) {
     FILE *f = fopen(PATH_UTENTI, "r");
     if (!f) return 0;
@@ -66,7 +66,7 @@ int carica_utenti(StatoBanca *banca) {
                                 banca->cap_utenti * sizeof(Utente));
         }
 
-        // carica l'ultimo utente
+        // carica l'ultimo elemento dell'array
         Utente *u = &banca->utenti[banca->n_utenti];
         // pulisce lo spazio in memoria suo
         memset(u, 0, sizeof(Utente));
@@ -117,7 +117,7 @@ int salva_conti(const StatoBanca *banca) {
     // per ogni utente, salviamo il suo conto
     for (int i = 0; i < banca->n_conti; i++) {
         const Conto *c = &banca->conti[i];
-        fprintf(f, "%d,%s,%d,%.2f,%d\n",
+        fprintf(f, "%d,%s,%d,%d,%d\n",
                 c->id, c->iban, c->id_utente, c->saldo, c->attivo);
     }
 
@@ -157,7 +157,7 @@ int carica_conti(StatoBanca *banca) {
         tok = strtok(buf, ","); if (!tok) continue; c->id = atoi(tok); // atoi per id
         tok = strtok(NULL, ","); if (!tok) continue; strncpy(c->iban, tok, 34);
         tok = strtok(NULL, ","); if (!tok) continue; c->id_utente = atoi(tok);
-        tok = strtok(NULL, ","); if (!tok) continue; c->saldo = atof(tok);
+        tok = strtok(NULL, ","); if (!tok) continue; c->saldo = atoi(tok);
         tok = strtok(NULL, ","); if (!tok) continue; c->attivo = atoi(tok);
 
         if (c->id >= banca->prossimo_id_conto)
@@ -180,7 +180,7 @@ int salva_transazioni(const StatoBanca *banca) {
     for (int i = 0; i < banca->n_conti; i++) {
         const Conto *c = &banca->conti[i];
         for (const Transazione *t = c->transazioni; t; t = t->next) {
-            fprintf(f, "%d,%d,%d,%.2f,%s\n",
+            fprintf(f, "%d,%d,%d,%d,%s\n",
                     t->id, c->id, t->tipo, t->importo,
                     t->iban_controparte);
         }
@@ -202,7 +202,7 @@ int carica_transazioni(StatoBanca *banca) {
         if (!riga[0]) continue;
 
         int    id, id_conto, tipo;
-        double importo;
+        int    importo;
         char   iban_cp[35];
 
         char buf[1024];
@@ -212,7 +212,7 @@ int carica_transazioni(StatoBanca *banca) {
         tok = strtok(buf, ",");  if (!tok) continue; id = atoi(tok);
         tok = strtok(NULL, ","); if (!tok) continue; id_conto = atoi(tok);
         tok = strtok(NULL, ","); if (!tok) continue; tipo = atoi(tok);
-        tok = strtok(NULL, ","); if (!tok) continue; importo = atof(tok);
+        tok = strtok(NULL, ","); if (!tok) continue; importo = atoi(tok);
         tok = strtok(NULL, ","); iban_cp[0] = '\0';
         if (tok) strncpy(iban_cp, tok, 34);
 

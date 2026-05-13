@@ -8,7 +8,7 @@
 // Transizioni gestiti tramite Lista linkata
 // crea Nodo transizione
 Transazione *transazione_aggiungi(StatoBanca *banca, Conto *conto,
-                                   TipoTransazione tipo, double importo,
+                                   TipoTransazione tipo, int importo,
                                    const char *iban_controparte) {
     Transazione *t = (Transazione *)malloc(sizeof(Transazione));
     if (!t) return NULL;
@@ -29,8 +29,8 @@ Transazione *transazione_aggiungi(StatoBanca *banca, Conto *conto,
 }
 
 // deposita soldi all'account inizialmente
-int deposita(StatoBanca *banca, const char *iban, double importo) {
-    if (importo <= 0.0) return 0;
+int deposita(StatoBanca *banca, const char *iban, int importo) {
+    if (importo <= 0) return 0;
 
     Conto *c = conto_cerca_iban(banca, iban);
     if (!c) return 0;
@@ -42,8 +42,8 @@ int deposita(StatoBanca *banca, const char *iban, double importo) {
 }
 
 // preleva soldi dall'account
-int preleva(StatoBanca *banca, const char *iban, double importo) {
-    if (importo <= 0.0) return 0;
+int preleva(StatoBanca *banca, const char *iban, int importo) {
+    if (importo <= 0) return 0;
 
     Conto *c = conto_cerca_iban(banca, iban);
     if (!c) return 0;
@@ -63,8 +63,8 @@ int preleva(StatoBanca *banca, const char *iban, double importo) {
 // processo bonifico
 int bonifico(StatoBanca *banca,
              const char *iban_mittente, const char *iban_destinatario,
-             double importo) {
-    if (importo <= 0.0) return -1;
+             int importo) {
+    if (importo <= 0) return -1;
 
     // trovo IBAN mittente
     Conto *mittente = conto_cerca_iban(banca, iban_mittente);
@@ -99,7 +99,7 @@ void transazione_to_json(const Transazione *t, char *out, int outsize) {
         "{"
         "\"id\":%d,"
         "\"tipo\":\"%s\","
-        "\"importo\":%.2f,"
+        "\"importo\":%d,"
         "\"iban_controparte\":\"%s\""
         "}",
         t->id,

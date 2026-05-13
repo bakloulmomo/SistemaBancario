@@ -5,20 +5,20 @@
 
 // Aggiunge nodo transazione in testa alla lista del conto.
 Transazione *transazione_aggiungi(StatoBanca *banca, Conto *conto,
-                                   TipoTransazione tipo, double importo,
+                                   TipoTransazione tipo, int importo,
                                    const char *iban_controparte);
 
 // Deposita importo sul conto. Ritorna 1 ok / 0 errore.
-int deposita(StatoBanca *banca, const char *iban, double importo);
+int deposita(StatoBanca *banca, const char *iban, int importo);
 
 // Preleva importo dal conto. Ritorna 1 ok / 0 se fondi insufficienti.
-int preleva(StatoBanca *banca, const char *iban, double importo);
+int preleva(StatoBanca *banca, const char *iban, int importo);
 
 // Bonifico tra due IBAN.
 // Ritorna: 1 ok / -1 mittente non trovato / -2 fondi insufficienti / -3 destinatario non trovato
 int bonifico(StatoBanca *banca,
              const char *iban_mittente, const char *iban_destinatario,
-             double importo);
+             int importo);
 
 // Libera l'intera lista collegata di transazioni di un conto.
 void transazioni_libera(Transazione *testa);

@@ -7,14 +7,14 @@ router.use(requireAuth);
 
 router.get('/', async (req, res) => {
   try {
-    const r = await eseguiCore({ cmd: 'lista_conti', token: req.token });
+    const r = await eseguiCore({ cmd: 'lista_conti', username: req.username, password: req.password });
     res.json(r);
   } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
 });
 
 router.get('/:iban/estratto', async (req, res) => {
   try {
-    const r = await eseguiCore({ cmd: 'estratto_conto', token: req.token, iban: req.params.iban });
+    const r = await eseguiCore({ cmd: 'estratto_conto', username: req.username, password: req.password, iban: req.params.iban });
     res.json(r);
   } catch (e) { res.status(500).json({ status: 'error', message: e.message }); }
 });
