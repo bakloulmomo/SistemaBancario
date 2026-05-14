@@ -82,6 +82,7 @@ int json_get_num(const char *json, const char *chiave, double *val_out) {
     return sscanf(pos, "%lf", val_out) == 1 ? 1 : 0;
 }
 
+// rimuove spazi da stringa
 void str_trim(char *s) {
     int len = strlen(s);
     while (len > 0 && isspace((unsigned char)s[len - 1]))

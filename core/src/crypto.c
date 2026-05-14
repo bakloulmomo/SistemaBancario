@@ -84,5 +84,5 @@ void password_decrypt(const char *hex_in, char *password_out) {
 int password_verifica(const char *password, const char *hex_salvato) {
     char decifrata[48] = {0};
     password_decrypt(hex_salvato, decifrata);
-    return strcmp(password, decifrata) == 0 ? 1 : 0;
+    return strcmp(password, decifrata) == 0 ? 1 : 0; // se vera ritorna 1, se falsa ritorna 0
 }

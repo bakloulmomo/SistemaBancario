@@ -26,6 +26,7 @@
 //   cerca_utenti    — username, password, query
 //   elimina_account — username, password
 
+// inizializzazione banca
 StatoBanca banca;
 
 // verifica credenziali di ritorno dal JSON, ritorna id_utente o -1
@@ -358,7 +359,13 @@ void cmd_invia(const char *json) {
 }
 
 void cmd_cerca_utenti(const char *json) {
-    char query[128];
+    char query[128]; // mandata dal JSON ogni volta per rimostrare gli utenti
+    // se query[0] (vuota), mostra tutti
+    // se str_contains_ci(u->nome, query), ci sta chiedendo se la query è nel nome (del destinatorio)
+    // se str_contains_ci(u->cognome, query), ci sta chiedendo se la query è nel cognome
+    // se str_contains_ci(u->username, query), ci sta chiedendo se la query è nell'username
+    // continue se la query non matcha niente
+
     char out[MAX_JSON_OUT];
 
     int id_self = verifica_credenziali(json);
@@ -428,25 +435,33 @@ void cmd_elimina_account(const char *json) {
 
 // ENTRYPOINT
 int main() {
+    // riazzeriamo i campi della banca per il comando che manderà il server 
     memset(&banca, 0, sizeof(StatoBanca));
-    utenti_init(&banca);
-    conti_init(&banca);
-    banca.prossimo_id_utente      = 1;
-    banca.prossimo_id_conto       = 1;
-    banca.prossimo_id_transazione = 1;
+    utenti_init(&banca); // inizializza utenti
+    conti_init(&banca); // e poi conti
+    // se è la prima esecuzione del sistema:  (se no, questi campi vengono sovrascritti poi da carica dati)
+    banca.prossimo_id_utente      = 1; // il primo utente avrà id 1
+    banca.prossimo_id_conto       = 1; // conto id utente = 1
+    banca.prossimo_id_transazione = 1; // e prossima transazionme = 1
 
     carica_dati(&banca);
 
     char input[MAX_INPUT];
+    // se non si riceve l'input nel fgets dal server, mandiamo noi una res JSON con "status":"error"
     if (!fgets(input, sizeof(input), stdin)) {
         char out[256];
         json_errore("nessun input ricevuto", out, sizeof(out));
         puts(out);
-        goto cleanup;
+        goto cleanup; // liberiamo memoria
     }
-    str_trim(input);
 
-    char cmd[64] = {0};
+    // togliamo spazi dalla stringa in input
+    // cosi abbiamo la stringa JSON in una riga così : {."--":"--",...}
+    str_trim(input); 
+ 
+
+    char cmd[64] = {0}; // array di caratteri inizializzato tutto a 0
+    // controllo campo cmd mancante
     if (!json_get_str(input, "cmd", cmd, sizeof(cmd))) {
         char out[256];
         json_errore("campo cmd mancante", out, sizeof(out));
@@ -454,6 +469,7 @@ int main() {
         goto cleanup;
     }
 
+    // scelta del server
     if      (strcmp(cmd, "registra")         == 0) cmd_registra(input);
     else if (strcmp(cmd, "login")            == 0) cmd_login(input);
     else if (strcmp(cmd, "profilo")          == 0) cmd_profilo(input);
@@ -465,15 +481,18 @@ int main() {
     else if (strcmp(cmd, "invia")            == 0) cmd_invia(input);
     else if (strcmp(cmd, "cerca_utenti")     == 0) cmd_cerca_utenti(input);
     else if (strcmp(cmd, "elimina_account")  == 0) cmd_elimina_account(input);
+    // se il comando inserito non è tra i precedenti, glielo comunichiamo al client con status error
     else {
         char out[256];
         json_errore("comando sconosciuto", out, sizeof(out));
         puts(out);
     }
 
+// comando per liberare la memoria in una parola
 cleanup:
     conti_libera(&banca);
     utenti_libera(&banca);
 
+    // fine programma
     return 0;
 }

@@ -30,7 +30,7 @@ typedef struct Transazione {
     struct Transazione *next;
 } Transazione;
 
-// Conto bancario — contiene testa della lista transazioni
+// Conto bancario (contiene anche la testa della lista transazioni)
 typedef struct {
     int         id;
     char        iban[35];
@@ -50,7 +50,7 @@ typedef struct {
     int  attivo;
 } Utente;
 
-// ---- Stato globale della banca ----
+// Stato globale della banca
 typedef struct {
     // Array dinamici
     Utente *utenti;

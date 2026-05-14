@@ -3,12 +3,12 @@
 
 #include "tipi.h"
 
-// ---- Generatori ----
+// generatori
 
-// Genera un IBAN italiano nel formato IT60 + ABI + CAB + CC(12 cifre)
+// genera un IBAN italiano nel formato IT60 + ABI + CAB + CC(12 cifre)
 void genera_iban(int id_conto, char *iban_out);
 
-// ---- JSON builder (output verso Node.js) ----
+// JSON builder (output verso Node.js)
 
 // Risposta successo: {"status":"ok","data":{...}}
 void json_ok(const char *data_json, char *out, int outsize);
@@ -16,7 +16,7 @@ void json_ok(const char *data_json, char *out, int outsize);
 // Risposta errore: {"status":"error","message":"..."}
 void json_errore(const char *messaggio, char *out, int outsize);
 
-// ---- JSON parser (input da Node.js) ----
+// JSON parser (input da Node.js)
 
 // Estrae valore stringa da JSON piatto: "chiave":"valore"
 int json_get_str(const char *json, const char *chiave,
@@ -25,8 +25,7 @@ int json_get_str(const char *json, const char *chiave,
 // Estrae valore numerico da JSON piatto: "chiave":123.45
 int json_get_num(const char *json, const char *chiave, double *val_out);
 
-// ---- Utilità stringhe ----
-
+// per stringhe:
 // Rimuove spazi iniziali/finali in-place
 void str_trim(char *s);
 
